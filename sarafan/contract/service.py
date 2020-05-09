@@ -49,28 +49,38 @@ class ContractService(Service):
             eth_client = EthereumNodeClient()
         self.eth = eth_client
 
-    @requirements()
-    async def token_service_req(self):
+    async def resolve(self):
+        """Resolve content and peering contract addresses from Sarafan token.
+
+        Should be called before start.
+        """
         self.create_token_service()
-        return [
-            self.token
-        ]
 
-    @requirements('token_service_req')
-    async def peering_service_req(self):
-        await self.create_peering_service()
-        return [
-            self.peering
-        ]
-
-    @requirements('token_service_req')
-    async def content_service_req(self):
+        if not self.content_address:
+            self.content_address = await self._resolve_contract_address('getContentContract')
         await self.create_content_service()
+
+        if not self.peering_address:
+            self.peering_address = await self._resolve_contract_address('getPeeringContract')
+        await self.create_peering_service()
+
+        self._resolved = True
+
+    async def start(self):
+        if not self._resolved:
+            await self.resolve()
+            self.log.warning("Contract service didn't resolved before the start")
+        await super().start()
+
+    @requirements()
+    async def contract_service_req(self):
         return [
+            self.token,
+            self.peering,
             self.content,
         ]
 
-    @requirements('content_service_req')
+    @requirements('contract_service_req')
     async def post_service_req(self):
         await self.create_post_service()
         return [

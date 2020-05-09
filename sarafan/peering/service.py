@@ -97,7 +97,7 @@ class PeeringService(Service):
         return sorted(self.peers_by_rating[:max_count],
                       key=lambda x: ascii_to_hash_distance(x.service_id, magnet))
 
-    async def discover(self, magnet: str, max_depth: int = 20) -> AsyncGenerator[Peer, None]:
+    async def discover(self, magnet: str, max_depth: int = 20) -> AsyncGenerator[PeerClient, None]:
         """Search for magnet location.
 
         0. Check if we know more than one peer

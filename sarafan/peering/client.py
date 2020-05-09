@@ -28,8 +28,8 @@ class InvalidPeerResponse(Exception):
     pass
 
 
-class ConnectionError(Exception):
-    pass
+# class ConnectionError(Exception):
+#     pass
 
 
 class MagnetError(Exception):
@@ -188,22 +188,30 @@ class PeerClient:
     async def download(self, magnet, to_path, chunk_size=256):
         """Download specified magnet content to local path.
 
+        File will be downloaded in file with suffix first. Match file checksum before
+        move to the requested destination.
+
         :param magnet: content magnet
         :param to_path: local path for downloaded file
         :param chunk_size: read chunk size
+        :raises InvalidChecksum: if downloaded file checksum didn't match
         """
         content_path = Path(to_path) / magnet_path(magnet)
         tmp_content_path = ''.join([str(content_path), 'tmp.%s' % random.randint(10000, 99999)])
         check = keccak.new(digest_bytes=32)
-        async with self._session.get(self._content_url(magnet_path(magnet)),
-                                     proxy=self.http_proxy) as resp:
-            with open(tmp_content_path, 'wb') as fd:
-                while True:
-                    chunk = await resp.content.read(chunk_size)
-                    if not chunk:
-                        break
-                    fd.write(chunk)
-                    check.update(data=chunk)
+        try:
+            async with self._session.get(self._content_url(magnet_path(magnet)),
+                                         proxy=self.http_proxy) as resp:
+                resp.raise_for_status()
+                with open(tmp_content_path, 'wb') as fd:
+                    while True:
+                        chunk = await resp.content.read(chunk_size)
+                        if not chunk:
+                            break
+                        fd.write(chunk)
+                        check.update(data=chunk)
+        except aiohttp.ClientError as e:
+            raise DownloadError(magnet) from e
         checksum = check.hexdigest()
         if checksum != magnet:
             os.unlink(tmp_content_path)
