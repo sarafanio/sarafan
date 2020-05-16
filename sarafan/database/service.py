@@ -38,9 +38,7 @@ class DatabaseService(Service):
             setattr(self, name, value(db=self._db))
 
     async def start(self):
-        self.log.info("Applying migrations...")
         apply_migrations(self._db_path)
-        self.log.info("Migrations applied")
         await super().start()
 
     async def stop(self):
