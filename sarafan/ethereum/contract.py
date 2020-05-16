@@ -63,13 +63,13 @@ class BaseContractEvent:
                 # if ETH_TO_DATACLASS_TYPE[f.metadata["abi_type"]] is str:
                 #     value = bytes(value, 'ascii')
                 input_values.append(value)
-        return b'0x' + encode_abi(input_types, input_values)
+        return '0x' + encode_abi(input_types, input_values).hex()
 
     def topics(self):
         """Get encoded topics list for contract event.
         """
         return ['0x%s' % self.get_signature_hash()] + [
-            b'0x' + encode_single(f.metadata["abi_type"], getattr(self, f.name))
+            '0x' + encode_single(f.metadata["abi_type"], getattr(self, f.name)).hex()
             for f in fields(self) if f.metadata["abi_indexed"]
         ]
 
@@ -104,11 +104,11 @@ class BaseContractEvent:
         # decode `topics` using collected type information and merge them with
         # names by position
         data = {
-            n: decode_single(t, d[2:])
+            n: decode_single(t, bytes.fromhex(d[2:]))
             for n, t, d in zip(indexed_names, indexed_types, event.topics[1:])
         }
         # decode events `data` content using collected indexed types
-        decoded = decode_abi(input_types, event.data[2:])
+        decoded = decode_abi(input_types, bytes.fromhex(event.data[2:]))
         # merge decoded values with field name by position and update
         data.update(dict(zip(field_names, decoded)))
         # convert camel-case event property names to snake-case
@@ -271,7 +271,7 @@ class Contract:
                 )
                 self.event_types[item["name"]] = event_type
                 setattr(self, item["name"], event_type)
-                log.info(
+                log.debug(
                     "Add signature for Event %s: %s",
                     event_type,
                     event_type.get_signature_hash(),

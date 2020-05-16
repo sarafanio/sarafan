@@ -121,23 +121,24 @@ class ContractEventService(Service):
             await asyncio.sleep(self.block_sleep_interval)
 
     async def fetch_events(self):
-        self.log.info("Start fetching events")
+        self.log.debug("Start fetching events")
         last_block_number = await self.client.block_number()
         for from_block, to_block in self.block_range:
             if to_block > last_block_number:
                 to_block = last_block_number
-            log.debug("Requesting events for %i - %i block range",
-                      from_block, to_block)
+            self.log.debug("Requesting events for %i - %i block range",
+                           from_block, to_block)
             resp = await self.client.get_logs(self.contract.address, from_block, to_block)
             if self.block_range.reverse:
                 resp = reversed(resp)
             for event in resp:
                 contract_event = self.contract.parse(event)
                 self._update_current_block(event.block_number)
-                log.debug("Notify subscribers about new event %s", contract_event)
+                self.log.debug("Notify subscribers about new event %s", contract_event)
                 await self.notify_subscribers(contract_event)
             if to_block == last_block_number:
-                log.debug("Last known block fetched, finish `fetch_events`")
+                self._update_current_block(last_block_number)
+                self.log.debug("Last known block fetched, finish `fetch_events`")
                 break
 
     def _update_current_block(self, value):

@@ -139,10 +139,18 @@ class ContractService(Service):
         """Resolve related contract address from main contract property.
 
         :param method_name: name of the abi method/property
+        :raise RuntimeError: if address can't be resolved
         :return:
         """
         res = await self.eth.call({
             "to": self.token.contract.address,
             "data": '0x%s' % self.token.contract.call(method_name).hex(),
         })
-        return to_checksum_address(decode_single('address', bytes.fromhex(res[2:])))
+        if res == '0x':
+            self.log.error("Can't resolve %s %s", method_name, self.token.contract.address)
+            raise Exception("Can't resolve contract address from method %s "
+                            "contract return 0x (looks like a wrong token contract "
+                            "address %s)" % (method_name, self.token.contract.address))
+        address = to_checksum_address(decode_single('address', bytes.fromhex(res[2:])))
+        self.log.debug("Contract address %s resolved from %s method", address, method_name)
+        return address

@@ -138,9 +138,9 @@ class EthereumNodeClient:
         :param params: params
         :return: RPC response
         """
-        if self._session.closed:  # pragma: no cover
-            log.warning("HTTP client session is closed, request interrupted")
-            return
+        # if self._session.closed:  # pragma: no cover
+        #     log.warning("HTTP client session is closed, request interrupted")
+        #     return
         log.debug("Ethereum node request method `%s`, params: %s", method, params)
         request_body = {
             "jsonrpc": "2.0",
@@ -149,11 +149,14 @@ class EthereumNodeClient:
         }
         if params:
             request_body["params"] = params
-        resp = await self._session.post(
-            self.node_url,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-        )
-        data = await resp.json()
+
+        async with ClientSession() as session:
+            resp = await session.post(
+                self.node_url,
+                json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            )
+            data = await resp.json()
+
         log.debug("Ethereum node response: %s", data)
         if "error" in data:
             message = data["error"].get("message")
