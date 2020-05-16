@@ -23,15 +23,17 @@ argparser.add_argument("--log-level", help="log level to output",
 
 
 class Application(Service):
+    """Sarafan application.
+
+    Handle configuration and components coupling.
+    """
     #: application config
     conf: configargparse.Namespace
 
     contract: ContractService
 
-    #: main queue with new publications from blockchain
+    #: queue with new publications from blockchain
     publications_queue: asyncio.Queue
-    #: queue with downloaded publications to parse and store
-    downloaded_publications_queue: asyncio.Queue
 
     def __init__(self, argv=None, **kwargs):
         super().__init__(**kwargs)
@@ -85,10 +87,14 @@ class Application(Service):
     @task()
     async def process_finished_downloads(self):
         download = await self.downloads.finished.get()
+        # TODO: update peers from download
         bundle_path = self.storage.get_absolute_path(download.magnet)
         with ContentBundle(bundle_path, 'r') as bundle:
-            markdown_content = bundle.render_markdown()  # TODO: fix
+            markdown_content = bundle.render_markdown()
             unpack_path = self.storage.get_unpack_path(download.magnet)
             bundle.extractall(unpack_path)
+        publication = await self.db.publications.get(download.magnet)
+        if publication.reply_to:
+            pass
         post = Post(magnet=download.magnet, content=markdown_content)
         self.db.posts.store(post)
