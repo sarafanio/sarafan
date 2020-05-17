@@ -1,6 +1,6 @@
 import sys
 import logging
-from asyncio import get_event_loop, CancelledError
+from asyncio import get_event_loop
 
 from .app import Application
 

@@ -53,8 +53,8 @@ async def test_contract_event_service_simple():
                   topics=pub.topics())
         ],
     ]
-    with mock.patch.object(node_client, 'get_logs', side_effect=logs),\
-         mock.patch.object(node_client, 'block_number', side_effect=[0, 1, 2]):
+    with mock.patch.object(node_client, 'get_logs', side_effect=logs), \
+            mock.patch.object(node_client, 'block_number', side_effect=[0, 1, 2]):
         await service.start()
         async with timeout(1):
             pub = await queue.get()
@@ -101,7 +101,7 @@ async def test_contract_event_block_range(reverse_order):
         [],
     ]
     with mock.patch.object(node_client, 'get_logs', side_effect=logs), \
-         mock.patch.object(node_client, 'block_number', side_effect=[0, 1, 2]):
+            mock.patch.object(node_client, 'block_number', side_effect=[0, 1, 2]):
         await service.start()
         async with timeout(1):
             pub = await queue.get()

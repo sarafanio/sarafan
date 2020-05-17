@@ -1,8 +1,7 @@
 import json
 from dataclasses import dataclass
 from typing import Optional, IO, Union, Dict
-from urllib.parse import urljoin
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZipFile
 
 
 class BundleError(Exception):

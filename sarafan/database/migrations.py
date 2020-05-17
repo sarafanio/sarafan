@@ -30,7 +30,7 @@ def apply_migrations(db_path):
             to_apply = backend.to_apply(migrations)
             if to_apply:
                 log.info("Applying migrations:\n%s",
-                             pretty_migration_list(to_apply))
+                         pretty_migration_list(to_apply))
                 backend.apply_migrations(to_apply)
                 log.info("Migrations successfully applied.")
             else:
@@ -41,8 +41,8 @@ def apply_migrations(db_path):
         if not applied:
             rollback = backend.to_rollback(migrations)
             log.error("Error while applying migration. "
-                          "Rolling back migrations:\n%s",
-                          pretty_migration_list(rollback))
+                      "Rolling back migrations:\n%s",
+                      pretty_migration_list(rollback))
             backend.rollback_migrations(rollback)
             raise MigrationError()
 

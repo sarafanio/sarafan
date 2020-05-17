@@ -1,6 +1,8 @@
 """
 magnet utils
 """
+
+
 def is_magnet(magnet: str):
     """Check if provided string is a magnet.
 

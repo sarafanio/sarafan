@@ -6,7 +6,6 @@ from core_service import Service
 
 from .collections import (
     Collection,
-    CommentsCollection,
     PostsCollection,
     PublicationsCollection,
 )
@@ -22,7 +21,7 @@ class DatabaseService(Service):
 
     publications = PublicationsCollection
     posts = PostsCollection
-    comments = CommentsCollection
+    # comments = CommentsCollection
 
     def __init__(self, database: str = ':memory:', **kwargs):
         super().__init__(**kwargs)
@@ -31,6 +30,7 @@ class DatabaseService(Service):
         self.log.info("Starting with database %s", database)
         self._db_path = database
         self._db = sqlite3.connect(database)
+        self._db.row_factory = sqlite3.Row
         self._initialize_collections()
 
     def _initialize_collections(self):

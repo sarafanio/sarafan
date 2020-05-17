@@ -11,7 +11,6 @@ class Publication:
     retention: int
 
 
-
 @dataclass
 class Post:
     magnet: str
