@@ -19,6 +19,7 @@ setup(
         'yoyo_migrations >= 7.0.1',
         'async-timeout >= 3.0.1',
         'ConfigArgParse >= 1.2',
+        'colorama >= 0.4.3',
     ],
     entry_points={
         'console_scripts': [

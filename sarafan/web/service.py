@@ -8,6 +8,7 @@ from core_service import Service
 
 from ..peering import Peer
 from .handlers import setup_routes
+from .logging import AccessLogger
 
 
 class AbstractApplicationInterface(ABC):
@@ -104,7 +105,7 @@ class WebService(Service):
 
         setup_routes(webapp)
 
-        self.runner = web.AppRunner(webapp)
+        self.runner = web.AppRunner(webapp, access_log_class=AccessLogger)
         await self.runner.setup()
         site = web.TCPSite(self.runner, self.host, self.port)
         await site.start()

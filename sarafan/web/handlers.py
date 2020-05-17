@@ -9,16 +9,6 @@ from sarafan.magnet import is_magnet
 log = logging.getLogger(__name__)
 
 
-def setup_routes(app):
-    app.add_routes([
-        web.get('/hello', hello),
-        web.get('/discover', discover),
-        web.get('/discover/{magnet}', discover),
-        web.post('/upload/{magnet}', upload),
-    ])
-    return app
-
-
 async def hello(request):
     """Hello page containing sarafan node metadata.
 
@@ -28,6 +18,7 @@ async def hello(request):
     :param request:
     :return:
     """
+    raise Exception("HOH")
     return web.json_response(await request.app['sarafan'].hello())
 
 
@@ -52,7 +43,7 @@ async def discover(request: Request):
         peers = await request.app['sarafan'].hot_peers()
 
     if peers is None or len(peers) == 0:
-        log.error("Respond with empty peer list: no peers received from application")
+        log.warn("Respond with empty peer list: no peers received from application")
         peers = []
 
     return web.json_response([{
@@ -154,3 +145,25 @@ async def awards(request):
             }
         ]
     })
+
+
+def setup_routes(app, node=True, content_path=None, client=True):
+    if node:
+        app.add_routes([
+            web.get('/hello', hello),
+            web.get('/discover', discover),
+            web.get('/discover/{magnet}', discover),
+            web.post('/upload/{magnet}', upload),
+        ])
+    if content_path:
+        app.add_routes([
+            web.static('/content', content_path)
+        ])
+    if client:
+        # TODO: replace with implementation of sarafan-app prototype
+        app.add_routes([
+            web.get('/publications', publications),
+            web.get('/abuses', abuses),
+            web.get('/awards', awards),
+        ])
+    return app

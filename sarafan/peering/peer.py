@@ -8,6 +8,7 @@ class Peer:
     content_service_id: Optional[str] = None
     version: Optional[str] = None
     rating: float = .0
+    address: Optional[str] = None
 
     def __hash__(self):
         return hash(self.service_id)

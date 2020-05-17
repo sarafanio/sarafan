@@ -26,6 +26,12 @@ argparser.add_argument("--db", help="sqlite database path",
                        default="db.sqlite")
 argparser.add_argument("--log-level", help="log level to output",
                        default="INFO", choices=('DEBUG', 'INFO', 'ERROR'))
+argparser.add_argument("--no-discover", action="store_false", dest="discover",
+                       help="Disable p2p network discover")
+argparser.add_argument("--no-serve", action="store_false", dest="serve",
+                       help="Don't expose stored content to network")
+argparser.add_argument("--no-app", action="store_false", dest="client_app",
+                       help="Disable client app endpoints")
 
 
 class Application(Service):
@@ -40,6 +46,8 @@ class Application(Service):
 
     #: queue with new publications from blockchain
     publications_queue: asyncio.Queue
+    #: queue with NewPeer events from contract
+    new_peers_queue: asyncio.Queue
 
     def __init__(self, argv=None, **kwargs):
         super().__init__(**kwargs)
@@ -49,6 +57,7 @@ class Application(Service):
         setup_logging(self.conf.log_level)
 
         self.publications_queue = asyncio.Queue()
+        self.new_peers_queue = asyncio.Queue()
 
         self.db = DatabaseService(database=self.conf.db)
         self.contract = ContractService(
@@ -60,8 +69,12 @@ class Application(Service):
             discovery=self.peering.discover,
             storage=self.storage
         )
-        # TODO: toggle services to match configuration
-        self.web = WebService(WebAppInterface(self))
+        self.web = WebService(
+            WebAppInterface(self),
+            node_api=self.conf.discover,
+            content_api=self.conf.serve,
+            client_api=self.conf.client_app,
+        )
 
     @requirements()
     async def app_req(self):
@@ -73,12 +86,16 @@ class Application(Service):
         Publication = content_contract.event('Publication')
         self.contract.content.subscribe(Publication, queue=self.publications_queue)
 
+        # Subscribe to new peers from peering contract
+        NewPeer = self.contract.peering.contract.event('NewPeer')
+        self.contract.peering.subscribe(NewPeer, queue=self.new_peers_queue)
+
         return [
             self.contract,
             self.db,
-            self.storage,
-            self.peering,
             self.downloads,
+            self.peering,
+            self.storage,
             self.web,
         ]
 
@@ -110,31 +127,33 @@ class Application(Service):
             post = Post(magnet=download.magnet, content=markdown_content)
             self.db.posts.store(post)
 
-    def hello(self):
-        """Hello node response.
-
-        Used by webapp handlers.
-        """
-        return {
-            "version": "PRE-ALPHA",
-            "content_service_id": 'dontknow',
-        }
+    @task()
+    async def process_new_peers(self):
+        new_peer_event = await self.new_peers_queue.get()
+        self.log.info("New peer received from contract %s", new_peer_event)
+        peer = Peer(service_id=new_peer_event.hostname)
+        await self.peering.add_peer(peer)
 
 
 class WebAppInterface(AbstractApplicationInterface):
+    """WebApp interface.
+
+    Implementation of webapps abstract application interface.
+    """
     def __init__(self, app: Application):
         self.app = app
 
     async def hello(self) -> Dict:
+        """Hello response content.
+        """
         return {
             'service_id': 'test'
         }
 
     async def hot_peers(self) -> List[Peer]:
-        return [
-            Peer('example'),
-            Peer('example2')
-        ]
+        """In-memory peers list.
+        """
+        return self.app.peering.peers_by_rating[:100]
 
     async def store_upload(self, magnet: str, stream: StreamReader):
         if not is_magnet(magnet):
