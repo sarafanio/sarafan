@@ -1,5 +1,7 @@
 import asyncio
 import sys
+from asyncio import StreamReader
+from typing import Dict, List
 
 import configargparse
 
@@ -9,9 +11,13 @@ from sarafan.contract import ContractService
 from sarafan.database.service import DatabaseService
 from sarafan.download import DownloadService
 from sarafan.logging import setup_logging
+from sarafan.magnet import is_magnet
 from sarafan.models import Post
+from sarafan.peering import Peer
 from sarafan.peering.service import PeeringService
 from sarafan.storage import StorageService
+from sarafan.web import WebService
+from sarafan.web.service import AbstractApplicationInterface
 
 argparser = configargparse.get_argument_parser()
 argparser.add_argument("--token", help="Sarafan token contract address",
@@ -54,6 +60,8 @@ class Application(Service):
             discovery=self.peering.discover,
             storage=self.storage
         )
+        # TODO: toggle services to match configuration
+        self.web = WebService(WebAppInterface(self))
 
     @requirements()
     async def app_req(self):
@@ -71,6 +79,7 @@ class Application(Service):
             self.storage,
             self.peering,
             self.downloads,
+            self.web,
         ]
 
     @task()
@@ -95,6 +104,39 @@ class Application(Service):
             bundle.extractall(unpack_path)
         publication = await self.db.publications.get(download.magnet)
         if publication.reply_to:
-            pass
-        post = Post(magnet=download.magnet, content=markdown_content)
-        self.db.posts.store(post)
+            self.log.error("Comments not implemented yet, skip")
+            return
+        else:
+            post = Post(magnet=download.magnet, content=markdown_content)
+            self.db.posts.store(post)
+
+    def hello(self):
+        """Hello node response.
+
+        Used by webapp handlers.
+        """
+        return {
+            "version": "PRE-ALPHA",
+            "content_service_id": 'dontknow',
+        }
+
+
+class WebAppInterface(AbstractApplicationInterface):
+    def __init__(self, app: Application):
+        self.app = app
+
+    async def hello(self) -> Dict:
+        return {
+            'service_id': 'test'
+        }
+
+    async def hot_peers(self) -> List[Peer]:
+        return [
+            Peer('example'),
+            Peer('example2')
+        ]
+
+    async def store_upload(self, magnet: str, stream: StreamReader):
+        if not is_magnet(magnet):
+            raise TypeError("Invalid magnet identifier %s" % magnet)
+        await self.app.storage.store(magnet, stream)

@@ -94,7 +94,6 @@ class DownloadService(Service):
         """Actually download magnet.
         """
         magnet = download.magnet
-        local_path = self.storage.get_absolute_path(magnet)
         download.status = DownloadStatus.DISCOVERY
         try:
             async for client in self.discovery(magnet):
@@ -104,7 +103,7 @@ class DownloadService(Service):
                 )
                 try:
                     download.status = DownloadStatus.DOWNLOAD
-                    await client.download(magnet, to_path=local_path)
+                    await client.download(magnet, self.storage.store)
                     download.status = DownloadStatus.FINISHED
                     peer_result.peer_alive = True
                     peer_result.magnet_found = True

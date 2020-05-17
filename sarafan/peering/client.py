@@ -1,21 +1,14 @@
 import logging
-import os
-import random
-import shutil
 from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Callable, Coroutine, List, Optional
 from urllib.parse import urljoin
 
 import aiohttp
-from Cryptodome.Hash import keccak
-from aiohttp import ClientResponseError
+from aiohttp import ClientResponseError, StreamReader
 from aiohttp.client import ClientSession, ClientTimeout
 
 from ..magnet import magnet_path
-
 from .peer import Peer
-
 
 log = logging.getLogger(__name__)
 
@@ -118,22 +111,6 @@ class PeerClient:
         log.debug("Hello response processed")
         return data
 
-    async def push(self, peers: List = None, magnets: Dict[str, List[str]] = None) -> bool:
-        """Push network information to the peer.
-
-        :param peers: list of peers
-        :param magnets: mapping of magnets to list of peers
-        """
-        assert peers or magnets, "List of peers or mapping of magnets required for push"
-        push_content = {
-            'peers': peers,
-            'magnets': magnets
-        }
-        log.debug("Pushing to peer %s. Push body: %s", self.peer, push_content)
-        await self._post(self._url('push'), json=push_content)
-        log.debug("Pushed successfully to %s", self.peer)
-        return True
-
     async def discover(self, magnet) -> DiscoveryResult:
         """Make discovery request to the node.
 
@@ -151,7 +128,7 @@ class PeerClient:
             "magnet": magnet
         }
         log.debug("Making %s discovery request to %s", magnet, self.peer)
-        data = await self._post(self._url('discover'), json=discover_body)
+        data = await self._get(self._url('discover'), params=discover_body)
         if 'match' not in data and 'near' not in data:
             log.debug("Peer discovery response didn't contain keys `match` or `near`")
             raise InvalidPeerResponse()
@@ -185,39 +162,19 @@ class PeerClient:
         await self._post(**params)
         log.info("Magnet successfully uploaded")
 
-    async def download(self, magnet, to_path, chunk_size=256):
-        """Download specified magnet content to local path.
+    async def download(self, magnet, store: Callable[[str, StreamReader], Coroutine]):
+        """Download specified magnet content to local storage.
 
         File will be downloaded in file with suffix first. Match file checksum before
         move to the requested destination.
-
-        :param magnet: content magnet
-        :param to_path: local path for downloaded file
-        :param chunk_size: read chunk size
-        :raises InvalidChecksum: if downloaded file checksum didn't match
         """
-        content_path = Path(to_path) / magnet_path(magnet)
-        tmp_content_path = ''.join([str(content_path), 'tmp.%s' % random.randint(10000, 99999)])
-        check = keccak.new(digest_bytes=32)
         try:
             async with self._session.get(self._content_url(magnet_path(magnet)),
                                          proxy=self.http_proxy) as resp:
                 resp.raise_for_status()
-                with open(tmp_content_path, 'wb') as fd:
-                    while True:
-                        chunk = await resp.content.read(chunk_size)
-                        if not chunk:
-                            break
-                        fd.write(chunk)
-                        check.update(data=chunk)
+                await store(magnet, resp.content)
         except aiohttp.ClientError as e:
             raise DownloadError(magnet) from e
-        checksum = check.hexdigest()
-        if checksum != magnet:
-            os.unlink(tmp_content_path)
-            log.error("Downloaded content file %s checksum %s didn't match", magnet, checksum)
-            raise InvalidChecksum(magnet, checksum)
-        shutil.move(tmp_content_path, content_path)
 
     async def has_magnet(self, magnet: str):
         """Check if node storing provided magnet.

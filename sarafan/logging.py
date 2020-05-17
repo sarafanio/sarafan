@@ -4,6 +4,7 @@ import logging.config
 def setup_logging(level='INFO'):
     logging.config.dictConfig({
         "version": 1,
+        "disable_existing_loggers": False,
         "formatters": {
             "default": {
                 "class": "logging.Formatter",
