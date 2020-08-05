@@ -18,7 +18,6 @@ async def hello(request):
     :param request:
     :return:
     """
-    raise Exception("HOH")
     return web.json_response(await request.app['sarafan'].hello())
 
 
@@ -43,7 +42,7 @@ async def discover(request: Request):
         peers = await request.app['sarafan'].hot_peers()
 
     if peers is None or len(peers) == 0:
-        log.warn("Respond with empty peer list: no peers received from application")
+        log.warning("Respond with empty peer list: no peers received from application")
         peers = []
 
     return web.json_response([{

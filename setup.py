@@ -11,6 +11,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'core-service == 0.1.0',
+        'stem >= 1.8.0',
         'aiohttp >= 3.6.2',
         'aiohttp-cors >= 0.7.0',
         'eth_abi >= 2.1.0',

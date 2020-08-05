@@ -156,6 +156,11 @@ class WebAppInterface(AbstractApplicationInterface):
         return self.app.peering.peers_by_rating[:100]
 
     async def store_upload(self, magnet: str, stream: StreamReader):
+        """Store content uploaded by other peer.
+
+        :param magnet: content magnet
+        :param stream: content bundle async stream
+        """
         if not is_magnet(magnet):
             raise TypeError("Invalid magnet identifier %s" % magnet)
         await self.app.storage.store(magnet, stream)
