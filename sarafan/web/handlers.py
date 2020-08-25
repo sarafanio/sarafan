@@ -9,6 +9,17 @@ from sarafan.magnet import is_magnet
 log = logging.getLogger(__name__)
 
 
+async def home(request):
+    """Reader UI if enabled.
+
+    :param request:
+    :return:
+    """
+    return web.json_response({
+        "todo": "UI"
+    })
+
+
 async def hello(request):
     """Hello page containing sarafan node metadata.
 
@@ -146,6 +157,69 @@ async def awards(request):
     })
 
 
+async def post_list(request):
+    """List of posts.
+
+
+    """
+    return web.json_response({
+        "result": [
+            {
+                "magnet": "123456",
+                "content": "Markdown text",
+            }
+        ],
+        "next_cursor": "ABas==",
+    })
+
+
+async def create_post(request):
+    """Create post and estimate publication cost.
+    """
+    tmp_post_id = '%s.draft' % str(uuid4())
+    base_path = PROJECT_ROOT / 'content' / 'drafts'
+    filename = base_path / ('{}.draft'.format(tmp_post_id))
+    with zipfile.ZipFile(filename, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        d = await request.json()
+        markdown_content = d['text']
+        content_json = {
+            "version": "1.0",
+            "text": markdown_content,
+            "nonce": tmp_post_id,
+        }
+        archive.writestr('content.json', str(json.dumps(content_json)))
+    checksum = keccak.new(digest_bytes=32)
+    with open(filename, 'rb') as fp:
+        chunk = fp.read(1024)
+        while chunk:
+            checksum.update(chunk)
+            chunk = fp.read(1024)
+    post_magnet = checksum.hexdigest()
+    target_path = base_path / '{}.draft'.format(post_magnet)
+    shutil.move(filename, target_path)
+    # TODO: check if magnet is already exist
+    size = os.path.getsize(target_path)
+    return web.json_response({
+        "magnet": post_magnet,
+        "size": size,
+        "cost": math.ceil(size / 1000000) + 1,
+    })
+
+
+async def publish(request: web.Request):
+    """Publish created post.
+    """
+    d = await request.json()
+    magnet = d['magnet']
+    private_key = d['privateKey']
+    base_path = PROJECT_ROOT / 'content' / 'drafts'
+    target_path = base_path / '{}.draft'.format(magnet)
+    await request.app['sarafan'].publish(target_path, magnet, private_key)
+    return web.json_response({
+        'status': 'queued'
+    })
+
+
 def setup_routes(app, node=True, content_path=None, client=True):
     if node:
         app.add_routes([
@@ -161,8 +235,12 @@ def setup_routes(app, node=True, content_path=None, client=True):
     if client:
         # TODO: replace with implementation of sarafan-app prototype
         app.add_routes([
+            web.get('/', home),
             web.get('/publications', publications),
             web.get('/abuses', abuses),
             web.get('/awards', awards),
+            web.get('/api/posts', post_list),
+            web.post('/api/create_post', create_post),
+            web.post('/api/publish', publish)
         ])
     return app

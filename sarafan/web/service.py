@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from asyncio import StreamReader
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from aiohttp import web
 
@@ -83,8 +83,9 @@ class WebService(Service):
                  node_api: bool = True,
                  content_api: bool = True,
                  client_api: bool = True,
-                 host: str = '0.0.0.0',
+                 host: str = '127.0.0.1',
                  port: int = 8080,
+                 content_path: Optional[str] = None,
                  **kwargs):
         self.app = app
 
@@ -95,6 +96,8 @@ class WebService(Service):
         self.host = host
         self.port = port
 
+        self.content_path = content_path
+
         super().__init__(**kwargs)
 
     async def start(self):
@@ -103,7 +106,12 @@ class WebService(Service):
         webapp = web.Application()
         webapp['sarafan'] = self.app
 
-        setup_routes(webapp)
+        setup_routes(
+            webapp,
+            node=self.node_api_enabled,
+            client=self.client_api_enabled,
+            content_path=self.content_path
+        )
 
         self.runner = web.AppRunner(webapp, access_log_class=AccessLogger)
         await self.runner.setup()

@@ -21,6 +21,8 @@ def cli(run_forever=True):
         logging.info("Starting shutdown sequence. "
                      "Press Ctrl + C second time to force shutdown "
                      "(you may lost some data)")
+    except Exception:  # noqa
+        logging.exception("Unhandled exception")
     finally:
         try:
             loop.run_until_complete(app.stop())

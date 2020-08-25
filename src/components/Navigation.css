@@ -1,0 +1,18 @@
+#navigation {
+    background-color: #2C3142;
+    color: white;
+}
+
+#navigation a {
+    color: white;
+}
+
+#navigation .logo {
+    margin-right: 1em;
+    text-transform: uppercase;
+}
+
+#navigation .logo a {
+    text-decoration: none;
+    font-weight: bold;
+}

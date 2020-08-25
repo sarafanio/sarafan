@@ -2,8 +2,9 @@ import socket
 from typing import Iterable, Tuple
 
 from stem.control import Controller
+from core_service import Service
 
-
+from .controller import HiddenServiceController
 
 
 class OnionService(Service):
@@ -17,8 +18,8 @@ class OnionService(Service):
         ('content', 'nginx:80'),
         ('contract', '%s:8080' % socket.gethostname()),
     )
-    content: OnionServiceController
-    contract: OnionServiceController
+    content: HiddenServiceController
+    contract: HiddenServiceController
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -27,7 +28,7 @@ class OnionService(Service):
         self.controller.authenticate()
 
         for name, target in self.services:
-            service = OnionServiceController(
+            service = HiddenServiceController(
                 name=name,
                 ports={'80': target},
                 controller=self.controller,

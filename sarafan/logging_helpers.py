@@ -12,7 +12,7 @@ def setup_logging(level='INFO'):
         "disable_existing_loggers": True,
         "formatters": {
             "default": {
-                "class": "sarafan.logging.ColoredLogFormatter",
+                "class": "sarafan.logging_helpers.ColoredLogFormatter",
                 "format": "%(asctime)s %(levelname)-7s %(message)s"
             }
         },

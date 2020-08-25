@@ -20,6 +20,14 @@ Features:
 pip install sarafan
 ```
 
+## Running tor proxy
+
+```bash
+brew install tor
+```
+
+You need also to enable control port in your `torrc`.
+
 ## Getting started
 
 After you finished installation, you can start sarafan node with just:

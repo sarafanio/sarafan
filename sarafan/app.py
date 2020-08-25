@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from asyncio import StreamReader
 from typing import Dict, List
@@ -10,14 +11,17 @@ from sarafan.bundle.bundle import ContentBundle
 from sarafan.contract import ContractService
 from sarafan.database.service import DatabaseService
 from sarafan.download import DownloadService
-from sarafan.logging import setup_logging
+from sarafan.logging_helpers import setup_logging
 from sarafan.magnet import is_magnet
 from sarafan.models import Post
+from sarafan.onion.controller import HiddenServiceController
 from sarafan.peering import Peer
 from sarafan.peering.service import PeeringService
+from sarafan.onion.service import OnionService
 from sarafan.storage import StorageService
 from sarafan.web import WebService
 from sarafan.web.service import AbstractApplicationInterface
+
 
 argparser = configargparse.get_argument_parser()
 argparser.add_argument("--token", help="Sarafan token contract address",
@@ -32,6 +36,19 @@ argparser.add_argument("--no-serve", action="store_false", dest="serve",
                        help="Don't expose stored content to network")
 argparser.add_argument("--no-app", action="store_false", dest="client_app",
                        help="Disable client app endpoints")
+argparser.add_argument("--content-path", action="store", dest="content_path",
+                       help="Path to the node content directory",
+                       default="./content/")
+argparser.add_argument("--web-port", action="store", dest="web_port",
+                       help="Port for local webserver",
+                       default="9231")
+argparser.add_argument("--tor-host", action="store", dest="tor_host",
+                       help="Host of the tor proxy with exposed control port",
+                       default="127.0.0.1")
+argparser.add_argument("--tor-socks-port", action="store", dest="tor_socks_port",
+                       help="Tor socks proxy port", default="9050")
+argparser.add_argument("--tor-control-port", action="store", dest="tor_control_port",
+                       help="Tor control port", default="9051")
 
 
 class Application(Service):
@@ -56,6 +73,11 @@ class Application(Service):
 
         setup_logging(self.conf.log_level)
 
+        self.conf.content_path = os.path.abspath(self.conf.content_path)
+        os.makedirs(self.conf.content_path, exist_ok=True)
+
+        self.log.info("Content path: %s", self.conf.content_path)
+
         self.publications_queue = asyncio.Queue()
         self.new_peers_queue = asyncio.Queue()
 
@@ -64,16 +86,24 @@ class Application(Service):
             token_address=self.conf.token
         )
         self.peering = PeeringService()
-        self.storage = StorageService(base_path='./content')
+        self.storage = StorageService(base_path=self.conf.content_path)
         self.downloads = DownloadService(
             discovery=self.peering.discover,
             storage=self.storage
         )
         self.web = WebService(
             WebAppInterface(self),
+            port=int(self.conf.web_port),
             node_api=self.conf.discover,
             content_api=self.conf.serve,
             client_api=self.conf.client_app,
+            content_path=self.conf.content_path,
+        )
+        # TODO: store and restore keys in order to preserve servece_id between restarts
+        self.hidden_service = HiddenServiceController(
+            app_port=self.conf.web_port,
+            stem_host=self.conf.tor_host,
+            stem_port=int(self.conf.tor_control_port),
         )
 
     @requirements()
@@ -97,6 +127,7 @@ class Application(Service):
             self.peering,
             self.storage,
             self.web,
+            self.hidden_service,
         ]
 
     @task()

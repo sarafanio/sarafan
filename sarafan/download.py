@@ -58,7 +58,7 @@ class DownloadService(Service):
     Handle download queue. New download can be added with `add` method. Content hash (magnet) should
     be provided. Then, `download_task` will handle discovery and actually download content file.
 
-    Clients should listen to `complete_queue` for download status.
+    Clients should listen to `finished` queue for download status.
     """
     #: discovery function
     discovery: Callable[[str], AsyncGenerator[PeerClient, None]]
