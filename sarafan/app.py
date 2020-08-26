@@ -169,7 +169,7 @@ class Application(Service):
             return
         else:
             post = Post(magnet=download.magnet, content=markdown_content)
-            self.db.posts.store(post)
+            await self.db.posts.store(post)
             self.log.debug("Post stored in the database %s", post)
 
     @task()
