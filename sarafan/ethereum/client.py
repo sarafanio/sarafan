@@ -9,6 +9,7 @@ from aiohttp import ClientSession
 
 from .exceptions import EXCEPTIONS_MAP, EthereumNodeException
 from .event import Event
+from ..logging_helpers import pformat
 
 log = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ class EthereumNodeClient:
         # if self._session.closed:  # pragma: no cover
         #     log.warning("HTTP client session is closed, request interrupted")
         #     return
-        log.debug("Ethereum node request method `%s`, params: %s", method, params)
+        log.debug("Ethereum node request method `%s`, params: %s", method, pformat(params))
         request_body = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -157,15 +158,15 @@ class EthereumNodeClient:
             )
             data = await resp.json()
 
-        log.debug("Ethereum node response: %s", data)
+        log.debug("Ethereum node response:\n%s", pformat(data))
         if "error" in data:
             message = data["error"].get("message")
             log.error(
                 "Ethereum node request to method `%s` with params `%s`"
                 "failed with error: %s",
                 method,
-                params,
-                data["error"],
+                pformat(params),
+                pformat(data["error"]),
             )
             if message in EXCEPTIONS_MAP:
                 cls = EXCEPTIONS_MAP[message]

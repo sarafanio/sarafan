@@ -120,7 +120,7 @@ class ContentBundle(ZipFile):
 
         :return:
         """
-        content_json = ContentJSON.parse(self.read('content.json'))
+        content_json = ContentJSON.parse(self.read('content.json').decode())
         if content_json.index:
             try:
                 ext = content_json.index.split('.')[-1]

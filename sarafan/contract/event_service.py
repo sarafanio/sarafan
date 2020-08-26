@@ -8,6 +8,7 @@ from core_service import Service, task
 from ..ethereum import Contract, EthereumNodeClient
 from ..ethereum.block_range import BlockRange
 from ..ethereum.contract import BaseContractEvent
+from ..logging_helpers import pformat
 
 
 log = logging.getLogger("sarafan_app")
@@ -99,7 +100,7 @@ class ContractEventService(Service):
             log.debug(
                 "Notify %i subscribers about new event %s",
                 listener_count,
-                contract_event,
+                pformat(contract_event),
             )
 
     @task(periodic=False)
@@ -141,7 +142,7 @@ class ContractEventService(Service):
                 self._loaded_events.add(event.transaction_hash)
                 contract_event = self.contract.parse(event)
                 self._update_current_block(event.block_number)
-                self.log.debug("Notify subscribers about new event %s", contract_event)
+                self.log.debug("Notify subscribers about new event %s", pformat(contract_event))
                 await self.notify_subscribers(contract_event)
             if to_block == last_block_number:
                 self._update_current_block(last_block_number)

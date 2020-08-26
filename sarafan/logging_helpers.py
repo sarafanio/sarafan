@@ -1,9 +1,23 @@
 import logging
+from pprint import pformat as original_pformat
 from colorama import init as colorama_init, Fore, Style
 import logging.config
 
 
 colorama_init()
+
+
+class pformat:  # noqa
+    """Lazy pformat.
+
+    Useful for debug logging: it will not affect runtime.
+    """
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return original_pformat(*self.args, **self.kwargs)
 
 
 def setup_logging(level='INFO'):

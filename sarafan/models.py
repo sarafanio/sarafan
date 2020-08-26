@@ -10,6 +10,9 @@ class Publication:
     size: int
     retention: int
 
+    # def __init__(self, magnet, reply_to, source, size, retention):
+    #     self.magnet = magnet
+
 
 @dataclass
 class Post:

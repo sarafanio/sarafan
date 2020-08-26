@@ -31,8 +31,8 @@ class StorageService(Service):
         :return:
         """
         to_path = self.get_absolute_path(magnet)
-        content_path = Path(to_path) / magnet_path(magnet)
-        tmp_content_path = ''.join([str(content_path), 'tmp.%s' % random.randint(10000, 99999)])
+        # content_path = Path(to_path) / magnet_path(magnet)
+        tmp_content_path = ''.join([str(to_path), 'tmp.%s' % random.randint(10000, 99999)])
         check = keccak.new(digest_bytes=32)
 
         try:

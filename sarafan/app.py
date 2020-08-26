@@ -12,10 +12,10 @@ from eth_account import Account
 from sarafan.bundle.bundle import ContentBundle
 from sarafan.contract import ContractService
 from sarafan.database.service import DatabaseService
-from sarafan.download import DownloadService
+from sarafan.download import DownloadService, Download, DownloadStatus
 from sarafan.logging_helpers import setup_logging
 from sarafan.magnet import is_magnet
-from sarafan.models import Post
+from sarafan.models import Post, Publication
 from sarafan.onion.controller import HiddenServiceController
 from sarafan.peering import Peer
 from sarafan.peering.service import PeeringService
@@ -137,6 +137,9 @@ class Application(Service):
         """Process new publications from blockchain.
         """
         publication = await self.publications_queue.get()
+        self.log.warning("Received magnet value: %s", publication.magnet)
+        publication.magnet = publication.magnet.hex()
+        self.log.warning("Decode magnet to %s", publication.magnet)
         self.log.debug("New publication received from contract %s", publication)
         try:
             await self.db.publications.store(publication)
@@ -153,7 +156,8 @@ class Application(Service):
     @task()
     async def process_finished_downloads(self):
         download = await self.downloads.finished.get()
-        # TODO: update peers from download
+        self.log.info("Process finished %s", download)
+        # TODO: update peers stats from download info
         bundle_path = self.storage.get_absolute_path(download.magnet)
         with ContentBundle(bundle_path, 'r') as bundle:
             markdown_content = bundle.render_markdown()
@@ -166,6 +170,7 @@ class Application(Service):
         else:
             post = Post(magnet=download.magnet, content=markdown_content)
             self.db.posts.store(post)
+            self.log.debug("Post stored in the database %s", post)
 
     @task()
     async def process_new_peers(self):
@@ -222,4 +227,26 @@ class WebAppInterface(AbstractApplicationInterface):
             author=account.address
         )
         # log.info("Schedule distribution...")
-        await self.app.peering.distribute(filename, magnet)
+        # make a look like a file was downloaded
+        await self.app.db.publications.store(Publication(
+            magnet=magnet,
+            reply_to='0x',
+            retention=12,
+            source='0x',
+            size=os.path.getsize(filename)
+        ))
+        target_filename = self.app.storage.get_absolute_path(magnet)
+        self.app.log.warning("Target filename: %s", target_filename)
+        target_filename.parent.mkdir(parents=True)
+        os.rename(filename, target_filename)
+        self.app.log.warning("Put download as finished to queue %s", magnet)
+        await self.app.downloads.finished.put(
+            Download(
+                magnet=magnet,
+                status=DownloadStatus.FINISHED,
+                log=[]
+            )
+        )
+
+        # distribute file over network
+        await self.app.peering.distribute(target_filename, magnet)

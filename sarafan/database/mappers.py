@@ -42,9 +42,7 @@ class DataclassMapper(AbstractMapper[T]):
             col_name = field.name
             if field.metadata and 'db_name' in field.metadata:
                 col_name = field.metadata['db_name']
-            value = data.get(col_name)
-            if value:
-                props[field.name] = value
+            props[field.name] = getattr(data, col_name, None)
         return self.model(**props)
 
     def get_insert_data(self, obj: T) -> Dict:
@@ -61,7 +59,13 @@ class PostMapper(DataclassMapper[Post]):
     model = Post
     table_name = 'sarafan_posts'
 
+    def get_pk_column(self):
+        return 'magnet'
+
 
 class PublicationMapper(DataclassMapper[Publication]):
     model = Publication
     table_name = 'sarafan_publications'
+
+    def get_pk_column(self):
+        return 'magnet'
