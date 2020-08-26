@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from asyncio import StreamReader
 from typing import Dict, List, Optional
 
+import aiohttp_cors
 from aiohttp import web
 
 from core_service import Service
@@ -103,11 +104,21 @@ class WebService(Service):
     async def start(self):
         await super().start()
 
-        webapp = web.Application()
+        webapp = web.Application(debug=True)
         webapp['sarafan'] = self.app
+
+        cors = aiohttp_cors.setup(webapp, defaults={
+            # Allow all to read all CORS-enabled resources from webapp
+            "*": aiohttp_cors.ResourceOptions(
+                expose_headers="*",
+                allow_headers="*",
+                allow_methods="*",
+            ),
+        })
 
         setup_routes(
             webapp,
+            cors,
             node=self.node_api_enabled,
             client=self.client_api_enabled,
             content_path=self.content_path

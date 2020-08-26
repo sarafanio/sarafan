@@ -65,6 +65,10 @@ class ContractEventService(Service):
 
         self._subscriptions = defaultdict(list)
 
+        # FIXME: should be flushed sometime
+        #  used to remove duplicates while loading events, not a good solution
+        self._loaded_events = set()
+
     async def stop(self):
         await self.client.close()
         await super().stop()
@@ -132,6 +136,9 @@ class ContractEventService(Service):
             if self.block_range.reverse:
                 resp = reversed(resp)
             for event in resp:
+                if event.transaction_hash in self._loaded_events:
+                    continue
+                self._loaded_events.add(event.transaction_hash)
                 contract_event = self.contract.parse(event)
                 self._update_current_block(event.block_number)
                 self.log.debug("Notify subscribers about new event %s", contract_event)

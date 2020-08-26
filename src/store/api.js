@@ -55,6 +55,6 @@ class SarafanAppBackend {
     }
 }
 
-const api = new SarafanAppBackend("http://localhost:8080/");
+const api = new SarafanAppBackend("http://localhost:9231/");
 
 export default api;

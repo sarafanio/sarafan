@@ -58,3 +58,17 @@ will overwrite them both.
 `--api-port`, `SARAFAN_API_PORT`, `api_port` can be used to change rest api port (`21112` by default)
 
 `--log-level`, `SARAFAN_LOG_LEVEL`, `log_level` minimal log level to output to console (default `ERROR`)
+
+## Charging test account
+
+Example `truffle console` session:
+
+```javascript
+let token = await SarafanToken.deployed();
+let content = await SarafanContent.deployed();
+let accounts = await web3.eth.getAccounts();
+// transfer tokens to the second account
+await token.transfer(accounts[1], 100);
+// approve spending for content contract from the second account
+await token.approve(content.address, 100, {from: accounts[1]});
+```

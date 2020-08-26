@@ -7,6 +7,8 @@ from typing import Dict, List
 import configargparse
 
 from core_service import Service, requirements, task
+from eth_account import Account
+
 from sarafan.bundle.bundle import ContentBundle
 from sarafan.contract import ContractService
 from sarafan.database.service import DatabaseService
@@ -136,10 +138,17 @@ class Application(Service):
         """
         publication = await self.publications_queue.get()
         self.log.debug("New publication received from contract %s", publication)
-        await self.db.publications.store(publication)
-        # TODO: check if it already downloaded
-        # TODO: check if it is downloaded but not parsed yet, submit to parse
-        await self.downloads.add(publication.magnet)
+        try:
+            await self.db.publications.store(publication)
+            # TODO: check if it already downloaded
+            # TODO: check if it is downloaded but not parsed yet, submit to parse
+            await self.downloads.add(publication.magnet)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self.log.exception("Exception happens while processing new publication. Skipping.")
+        finally:
+            self.publications_queue.task_done()
 
     @task()
     async def process_finished_downloads(self):
@@ -195,3 +204,22 @@ class WebAppInterface(AbstractApplicationInterface):
         if not is_magnet(magnet):
             raise TypeError("Invalid magnet identifier %s" % magnet)
         await self.app.storage.store(magnet, stream)
+
+    async def publish(self, filename, magnet, private_key):
+        """Publish draft post by magnet.
+
+        - content contract `post()`
+        - push to known nodes
+        """
+        account = Account.from_key(private_key)
+        # log.info("Post to contract from %s", account.address)
+        await self.app.contract.post_service.post(
+            address=account.address,
+            private_key=private_key,
+            reply_to=b'0',
+            magnet=bytes.fromhex(magnet),
+            size=os.path.getsize(filename),
+            author=account.address
+        )
+        # log.info("Schedule distribution...")
+        await self.app.peering.distribute(filename, magnet)

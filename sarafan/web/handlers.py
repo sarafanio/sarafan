@@ -1,5 +1,13 @@
+import json
+import math
+import os
+import shutil
+from pathlib import Path
+from uuid import uuid4
 import logging
+import zipfile
 
+from Cryptodome.Hash import keccak
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPBadRequest
 from aiohttp.web_request import Request
@@ -7,6 +15,8 @@ from aiohttp.web_request import Request
 from sarafan.magnet import is_magnet
 
 log = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
 async def home(request):
@@ -220,7 +230,7 @@ async def publish(request: web.Request):
     })
 
 
-def setup_routes(app, node=True, content_path=None, client=True):
+def setup_routes(app, cors, node=True, content_path=None, client=True):
     if node:
         app.add_routes([
             web.get('/hello', hello),
@@ -243,4 +253,8 @@ def setup_routes(app, node=True, content_path=None, client=True):
             web.post('/api/create_post', create_post),
             web.post('/api/publish', publish)
         ])
+    # Configure CORS on all routes.
+    for route in list(app.router.routes()):
+        log.info("Add %s to cors", route)
+        cors.add(route)
     return app
