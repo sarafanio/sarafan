@@ -40,7 +40,6 @@ class Collection(Generic[T]):
             log.debug("Retrieve %s with query `%s` %s=%s", self.mapper.model, query, pk_column, pk)
             cursor.execute(query, [pk])
             data = cursor.fetchone()
-            # import ipdb; ipdb.set_trace()
             return self.mapper.build_object(data)
 
     async def store(self, obj: T):
@@ -63,3 +62,11 @@ class PublicationsCollection(Collection[Publication]):
 
 class PostsCollection(Collection[Post]):
     mapper = PostMapper()
+
+    def all(self, page=1, per_page=100):
+        query = f"SELECT * FROM {self.table_name}"
+        with self.db as db:
+            cursor = db.cursor()
+            cursor.execute(query)
+            result = cursor.fetchall()
+        return [self.mapper.build_object(item) for item in result]

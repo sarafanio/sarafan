@@ -172,12 +172,11 @@ async def post_list(request):
 
 
     """
+    posts = request.app['sarafan'].app.db.posts.all()
+    log.info("Posts received: %s", posts)
     return web.json_response({
         "result": [
-            {
-                "magnet": "123456",
-                "content": "Markdown text",
-            }
+            post.to_dict() for post in posts
         ],
         "next_cursor": "ABas==",
     })

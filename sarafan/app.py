@@ -137,21 +137,19 @@ class Application(Service):
         """Process new publications from blockchain.
         """
         publication = await self.publications_queue.get()
-        self.log.warning("Received magnet value: %s", publication.magnet)
+        # magnet received as bytes32, it would be better to decode it inside event service
         publication.magnet = publication.magnet.hex()
-        self.log.warning("Decode magnet to %s", publication.magnet)
         self.log.debug("New publication received from contract %s", publication)
-        try:
+        if self.db.publications.get(publication.magnet):
+            self.log.debug("Publication %s already created in the database, just reschedule "
+                           "download", publication)
+        else:
+            self.log.debug("Store new publication %s", publication)
             await self.db.publications.store(publication)
-            # TODO: check if it already downloaded
-            # TODO: check if it is downloaded but not parsed yet, submit to parse
-            await self.downloads.add(publication.magnet)
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            self.log.exception("Exception happens while processing new publication. Skipping.")
-        finally:
-            self.publications_queue.task_done()
+        # TODO: check if it already downloaded
+        # TODO: check if it is downloaded but not parsed yet, submit to parse
+        await self.downloads.add(publication.magnet)
+        self.publications_queue.task_done()
 
     @task()
     async def process_finished_downloads(self):
@@ -164,13 +162,10 @@ class Application(Service):
             unpack_path = self.storage.get_unpack_path(download.magnet)
             bundle.extractall(unpack_path)
         publication = await self.db.publications.get(download.magnet)
-        if publication.reply_to:
-            self.log.error("Comments not implemented yet, skip")
-            return
-        else:
-            post = Post(magnet=download.magnet, content=markdown_content)
-            await self.db.posts.store(post)
-            self.log.debug("Post stored in the database %s", post)
+        # TODO: support comments and reply_to
+        post = Post(magnet=download.magnet, content=markdown_content)
+        await self.db.posts.store(post)
+        self.log.debug("Post stored in the database %s", post)
 
     @task()
     async def process_new_peers(self):

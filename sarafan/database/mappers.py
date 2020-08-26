@@ -42,7 +42,7 @@ class DataclassMapper(AbstractMapper[T]):
             col_name = field.name
             if field.metadata and 'db_name' in field.metadata:
                 col_name = field.metadata['db_name']
-            props[field.name] = getattr(data, col_name, None)
+            props[field.name] = data[col_name]
         return self.model(**props)
 
     def get_insert_data(self, obj: T) -> Dict:
