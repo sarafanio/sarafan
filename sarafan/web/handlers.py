@@ -11,6 +11,7 @@ from Cryptodome.Hash import keccak
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPBadRequest
 from aiohttp.web_request import Request
+from aiohttp.web_response import Response
 
 from sarafan.magnet import is_magnet
 
@@ -25,9 +26,9 @@ async def home(request):
     :param request:
     :return:
     """
-    return web.json_response({
-        "todo": "UI"
-    })
+    with open(Path(__file__).parent.parent.parent / 'build' / 'index.html') as fp:
+        content = fp.read()
+    return Response(content_type='text/html', text=content)
 
 
 async def hello(request):
@@ -254,7 +255,8 @@ def setup_routes(app, cors, node=True, content_path=None, client=True):
             web.get('/awards', awards),
             web.get('/api/posts', post_list),
             web.post('/api/create_post', create_post),
-            web.post('/api/publish', publish)
+            web.post('/api/publish', publish),
+            web.static('/', Path(__file__).parent.parent.parent / 'build')
         ])
     # Configure CORS on all routes.
     for route in list(app.router.routes()):
