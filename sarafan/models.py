@@ -22,3 +22,4 @@ class Publication:
 class Post:
     magnet: str
     content: str
+    created_at: int = None

@@ -45,7 +45,7 @@ class StorageService(Service):
             if checksum != magnet:
                 self.log.error("Downloaded content file %s checksum %s didn't match", magnet, checksum)
                 raise InvalidChecksum(magnet, checksum)
-            shutil.move(tmp_content_path, content_path)
+            shutil.move(tmp_content_path, to_path)
         finally:
             os.unlink(tmp_content_path)
 

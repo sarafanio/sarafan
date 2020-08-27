@@ -7,8 +7,12 @@ class SarafanAppBackend {
         this.publishPost = this.publishPost.bind(this);
         this.authenticate = this.authenticate.bind(this);
     }
-    async fetchPosts() {
-        const resp = await fetch(this.backend_url + 'api/posts', { method: "GET" })
+    async fetchPosts(cursor) {
+        let url = this.backend_url + 'api/posts';
+        if (cursor) {
+            url += '?cursor=' + cursor
+        }
+        const resp = await fetch(url, { method: "GET" })
         const data = await resp.json()
         return data
     }

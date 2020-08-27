@@ -68,7 +68,7 @@ let token = await SarafanToken.deployed();
 let content = await SarafanContent.deployed();
 let accounts = await web3.eth.getAccounts();
 // transfer tokens to the second account
-await token.transfer(accounts[1], 100);
+await token.transfer(accounts[1], 1000);
 // approve spending for content contract from the second account
-await token.approve(content.address, 100, {from: accounts[1]});
+await token.approve(content.address, 1000, {from: accounts[1]});
 ```

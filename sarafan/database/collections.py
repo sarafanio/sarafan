@@ -1,6 +1,8 @@
 import logging
 import sqlite3
+from base64 import b64decode, b64encode
 from typing import TypeVar, Generic
+from urllib.parse import parse_qs, urlencode
 
 from ..models import Publication, Post
 
@@ -63,10 +65,26 @@ class PublicationsCollection(Collection[Publication]):
 class PostsCollection(Collection[Post]):
     mapper = PostMapper()
 
-    def all(self, page=1, per_page=100):
-        query = f"SELECT * FROM {self.table_name}"
+    def all(self, cursor=None, per_page=2):
+        args = []
+        query = f"SELECT ROWID, * FROM {self.table_name} "
+        if cursor is not None:
+            cursor_data = parse_qs(b64decode(cursor.encode()))
+            parse_qs(b64decode(cursor.encode()), encoding='utf-8')
+            # import ipdb; ipdb.set_trace()
+            last_time = cursor_data[b't'][0].decode()
+            last_rowid = cursor_data[b'r'][0].decode()
+            query += f"WHERE created_at <= ? AND ROWID < ? "
+            args += [last_time, last_rowid]
+        query += f"ORDER BY created_at DESC LIMIT {per_page}"
         with self.db as db:
             cursor = db.cursor()
-            cursor.execute(query)
+            cursor.execute(query, args)
             result = cursor.fetchall()
-        return [self.mapper.build_object(item) for item in result]
+        next_cursor = None
+        if len(result) == per_page:
+            next_cursor = b64encode(urlencode({
+                't': result[-1]['created_at'],
+                'r': result[-1]['ROWID']
+            }).encode()).decode()
+        return [self.mapper.build_object(item) for item in result], next_cursor

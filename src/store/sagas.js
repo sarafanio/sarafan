@@ -4,15 +4,17 @@ import {
   PUBLISH_ESTIMATED_POST,
 } from "./actions";
 import { call, all, put, spawn, takeLatest, take  } from "redux-saga/effects";
-import { addPost } from "../store/actions";
+import { addPost, saveNextCursor } from "../store/actions";
 import api from "./api";
 
 
-function* fetchPosts() {
-  const resp = yield call(api.fetchPosts);
+function* fetchPosts(action) {
+  const cursor = action.cursor;
+  const resp = yield call(api.fetchPosts, cursor);
   for (let item of resp.result) {
     yield put(addPost(item.magnet, item.content));
   }
+  yield put(saveNextCursor(resp.next_cursor))
 }
 
 function* createPost(action) {

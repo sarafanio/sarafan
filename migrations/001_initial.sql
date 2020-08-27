@@ -16,7 +16,8 @@ create index idx_sarafan_publication_reply_to on sarafan_publications (reply_to)
 */
 create table sarafan_posts (
     magnet text primary key,
-    content text not null
+    content text not null,
+    created_at datetime DEFAULT CURRENT_TIMESTAMP
 );
 
 /**

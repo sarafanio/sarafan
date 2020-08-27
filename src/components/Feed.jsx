@@ -7,7 +7,6 @@ class Feed extends React.Component {
   render() {
     return (
       <div id="feed">
-        <p>Feed:</p>
         {this.props.publications.map((post, index) => (
           <Post key={index} post={post} />
         ))}

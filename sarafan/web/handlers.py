@@ -172,13 +172,14 @@ async def post_list(request):
 
 
     """
-    posts = request.app['sarafan'].app.db.posts.all()
+    cursor = request.query.get('cursor')
+    posts, next_cursor = request.app['sarafan'].app.db.posts.all(cursor=cursor)
     log.info("Posts received: %s", posts)
     return web.json_response({
         "result": [
             post.to_dict() for post in posts
         ],
-        "next_cursor": "ABas==",
+        "next_cursor": next_cursor,
     })
 
 

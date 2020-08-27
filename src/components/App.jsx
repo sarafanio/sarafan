@@ -14,7 +14,12 @@ import { feedFetchRequest } from "../store/actions";
 
 class App extends React.Component {
   refreshFeed() {
-    this.props.dispatch(feedFetchRequest());
+    if (!this.props.ended) {
+      this.props.dispatch(feedFetchRequest(this.props.cursor));
+    }
+  }
+  componentDidMount() {
+    this.props.dispatch(feedFetchRequest(this.props.cursor));
   }
   render() {
     return (
@@ -36,4 +41,11 @@ class App extends React.Component {
   }
 }
 
-export default connect()(App);
+const mapStateToProps = state => {
+  return {
+    cursor: state.uiState.cursor,
+    ended: state.uiState.ended,
+  }
+}
+
+export default connect(mapStateToProps)(App);

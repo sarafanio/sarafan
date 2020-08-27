@@ -21,7 +21,7 @@ setup(
         'async-timeout >= 3.0.1',
         'ConfigArgParse >= 1.2',
         'colorama >= 0.4.3',
-        'dataclass_json >= 0.5.2',
+        'dataclasses-json >= 0.5.2',
     ],
     entry_points={
         'console_scripts': [

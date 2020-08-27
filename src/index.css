@@ -19,3 +19,7 @@ code {
   margin-left: auto;
   padding: .5em;
 }
+
+.feed_post > * {
+  overflow: hidden;
+}

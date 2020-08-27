@@ -2,6 +2,7 @@ import { combineReducers } from 'redux'
 
 import {
   ADD_PUBLICATION,
+  UPDATE_CURSOR,
 } from './actions'
 
 function publications(state = [], action) {
@@ -18,7 +19,24 @@ function publications(state = [], action) {
       return state
   }
 }
+
+function uiState(state = {}, action) {
+  switch (action.type) {
+    case UPDATE_CURSOR:
+      let ended = !action.cursor;
+      return {
+        ...state,
+        cursor: action.cursor,
+        ended
+      }
+    default:
+      return state
+  }
+}
+
 const sarafanApp = combineReducers({
   publications,
-})
+  uiState,
+});
+
 export default sarafanApp

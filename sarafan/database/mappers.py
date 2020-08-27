@@ -51,7 +51,9 @@ class DataclassMapper(AbstractMapper[T]):
             col_name = field.name
             if field.metadata and 'db_name' in field.metadata:
                 col_name = field.metadata['db_name']
-            values[col_name] = getattr(obj, field.name)
+            v = getattr(obj, field.name)
+            if v is not None:
+                values[col_name] = v
         return values
 
 
