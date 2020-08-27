@@ -189,14 +189,14 @@ async def create_post(request):
     tmp_post_id = '%s.draft' % str(uuid4())
     base_path = PROJECT_ROOT / 'content' / 'drafts'
     filename = base_path / ('{}.draft'.format(tmp_post_id))
+    d = await request.json()
+    markdown_content = d['text']
+    content_json = {
+        "version": "1.0",
+        "text": markdown_content,
+        "nonce": tmp_post_id,
+    }
     with zipfile.ZipFile(filename, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        d = await request.json()
-        markdown_content = d['text']
-        content_json = {
-            "version": "1.0",
-            "text": markdown_content,
-            "nonce": tmp_post_id,
-        }
         archive.writestr('content.json', str(json.dumps(content_json)))
     checksum = keccak.new(digest_bytes=32)
     with open(filename, 'rb') as fp:
@@ -209,6 +209,9 @@ async def create_post(request):
     shutil.move(filename, target_path)
     # TODO: check if magnet is already exist
     size = os.path.getsize(target_path)
+    # TODO: publish in another step
+    if 'privateKey' in d:
+        await request.app['sarafan'].publish(target_path, post_magnet, d['privateKey'])
     return web.json_response({
         "magnet": post_magnet,
         "size": size,

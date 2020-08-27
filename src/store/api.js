@@ -16,9 +16,10 @@ class SarafanAppBackend {
         const data = await resp.json()
         return data
     }
-    async createPost(text) {
+    async createPost(text, privateKey) {
         let data = {
             text: text,
+            privateKey: privateKey
         }
         const resp = await fetch(this.backend_url + 'api/create_post', { 
             method: "POST",

@@ -42,6 +42,9 @@ class Collection(Generic[T]):
             log.debug("Retrieve %s with query `%s` %s=%s", self.mapper.model, query, pk_column, pk)
             cursor.execute(query, [pk])
             data = cursor.fetchone()
+            if data is None:
+                log.debug("No %s with %s=%s", self.mapper.model, pk_column, pk)
+                return None
             return self.mapper.build_object(data)
 
     async def store(self, obj: T):

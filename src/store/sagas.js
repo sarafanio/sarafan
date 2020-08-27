@@ -17,13 +17,13 @@ function* fetchPosts(action) {
   yield put(saveNextCursor(resp.next_cursor))
 }
 
-function* createPost(action) {
-  const resp = yield call(api.createPost, action.text);
+function* createPost(action, privateKey) {
+  const resp = yield call(api.createPost, action.text, action.privateKey);
   console.log("Created post", resp);
-  yield take(PUBLISH_ESTIMATED_POST);
-  console.log("Need to publish", resp);
-  const resp2 = yield call(api.publishPost, resp.magnet, action.privateKey);
-  console.log("Second response received", resp2);
+  // yield take(PUBLISH_ESTIMATED_POST);
+  // console.log("Need to publish", resp);
+  // const resp2 = yield call(api.publishPost, resp.magnet, action.privateKey);
+  // console.log("Second response received", resp2);
 }
 
 function* watchFetchPosts() {

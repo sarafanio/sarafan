@@ -140,7 +140,7 @@ class Application(Service):
         # magnet received as bytes32, it would be better to decode it inside event service
         publication.magnet = publication.magnet.hex()
         self.log.debug("New publication received from contract %s", publication)
-        if self.db.publications.get(publication.magnet):
+        if await self.db.publications.get(publication.magnet):
             self.log.debug("Publication %s already created in the database, just reschedule "
                            "download", publication)
         else:
