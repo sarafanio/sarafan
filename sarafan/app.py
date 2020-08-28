@@ -11,6 +11,7 @@ from eth_account import Account
 
 from sarafan.bundle.bundle import ContentBundle
 from sarafan.contract import ContractService
+from sarafan.contract.announcement_service import AnnouncementService
 from sarafan.database.service import DatabaseService
 from sarafan.download import DownloadService, Download, DownloadStatus
 from sarafan.logging_helpers import setup_logging
@@ -51,6 +52,10 @@ argparser.add_argument("--tor-socks-port", action="store", dest="tor_socks_port"
                        help="Tor socks proxy port", default="9050")
 argparser.add_argument("--tor-control-port", action="store", dest="tor_control_port",
                        help="Tor control port", default="9051")
+argparser.add_argument("--node-account", action="store", dest="node_account",
+                       help="Node ethereum account address for peering contract operations")
+argparser.add_argument("--node-private-key", action="store", dest="node_private_key",
+                       help="Node ethereum account address for peering contract operations")
 
 
 class Application(Service):
@@ -122,7 +127,7 @@ class Application(Service):
         NewPeer = self.contract.peering.contract.event('NewPeer')
         self.contract.peering.subscribe(NewPeer, queue=self.new_peers_queue)
 
-        return [
+        services = [
             self.contract,
             self.db,
             self.downloads,
@@ -131,6 +136,20 @@ class Application(Service):
             self.web,
             self.hidden_service,
         ]
+        if self.conf.node_account and self.conf.node_private_key:
+            self.log.info("Make an announcement of the node")
+            services.append(
+                AnnouncementService(
+                    peering_contract=self.contract.peering.contract,
+                    hidden_service=self.hidden_service,
+                    node_account=self.conf.node_account,
+                    node_private_key=self.conf.node_private_key,
+                )
+            )
+        else:
+            self.log.info("Skip node announcement because node account and "
+                          "private key are not provided")
+        return services
 
     @task()
     async def process_new_publications(self):
@@ -166,13 +185,15 @@ class Application(Service):
         post = Post(magnet=download.magnet, content=markdown_content)
         await self.db.posts.store(post)
         self.log.debug("Post stored in the database %s", post)
+        self.downloads.finished.task_done()
 
     @task()
     async def process_new_peers(self):
         new_peer_event = await self.new_peers_queue.get()
         self.log.info("New peer received from contract %s", new_peer_event)
-        peer = Peer(service_id=new_peer_event.hostname)
+        peer = Peer(service_id=new_peer_event.hostname.decode())
         await self.peering.add_peer(peer)
+        self.new_peers_queue.task_done()
 
 
 class WebAppInterface(AbstractApplicationInterface):
@@ -242,6 +263,7 @@ class WebAppInterface(AbstractApplicationInterface):
                 log=[]
             )
         )
-
+        self.app.log.info("Starting file distribution")
         # distribute file over network
-        await self.app.peering.distribute(target_filename, magnet)
+        # await self.app.peering.distribute(target_filename, magnet)
+        self.app.log.info("Finish publishing")

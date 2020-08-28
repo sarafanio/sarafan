@@ -12,13 +12,13 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import List, Dict, AsyncGenerator
 
+from aiohttp_socks import ProxyError
 from core_service import Service, task
 
 from ..distance import ascii_to_hash_distance
 
 from .peer import Peer
-from .client import PeerClient
-
+from .client import PeerClient, InvalidPeerResponse
 
 log = logging.getLogger(__name__)
 
@@ -116,11 +116,14 @@ class PeeringService(Service):
 
                 client = self.get_client(peer)
 
-                has_magnet = await client.has_magnet(magnet)
-                if has_magnet:
-                    yield peer
+                try:
+                    has_magnet = await client.has_magnet(magnet)
+                    if has_magnet:
+                        yield peer
 
-                new_peers = await client.discover(magnet)
+                    new_peers = await client.discover(magnet)
+                except (InvalidPeerResponse, ProxyError):
+                    continue
 
                 for p in chain(new_peers.match, new_peers.near):
                     if p.service_id not in self.peers:

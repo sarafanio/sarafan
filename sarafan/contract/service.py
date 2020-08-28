@@ -21,6 +21,8 @@ class ContractService(Service):
 
     #: content posting service
     post_service: PostService
+    #: peer announcement service
+    # announcement_service:
 
     # contract services
     token: ContractEventService

@@ -15,7 +15,7 @@ class HiddenServiceController(Service):
     controller: Controller
 
     app_port: str
-    private_key: str = 'BEST'
+    private_key: str = 'RSA1024'
     private_key_type: str = 'NEW'
     service_id: Optional[str] = None
 
@@ -25,7 +25,7 @@ class HiddenServiceController(Service):
 
     def __init__(self,
                  app_port: str = '8080',
-                 private_key='BEST',
+                 private_key='RSA1024',
                  private_key_type='NEW',
                  stem_host='localhost',
                  stem_port='default',
@@ -69,7 +69,8 @@ class HiddenServiceController(Service):
 
     async def get_service_id(self):
         if self.service_id is None:
-            self.service_id = await self._service_id_future
+            await self._service_id_future
+            self.service_id = self._service_id_future.result()
         return self.service_id
 
     async def stop(self):

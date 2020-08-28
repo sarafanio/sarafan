@@ -132,4 +132,7 @@ class DownloadService(Service):
     @task()
     async def download_task(self):
         download = await self.download_queue.get()
-        await self.download(download)
+        try:
+            await self.download(download)
+        except asyncio.TimeoutError:
+            self.log.info("Download timed out")

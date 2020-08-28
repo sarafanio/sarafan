@@ -24,7 +24,7 @@ async def test_app_simple(resolve_mock):
 @patch("sarafan.contract.service.ContractService._resolve_contract_address",
        return_value=generate_rnd_address())
 @patch("sarafan.contract.service.EthereumNodeClient.get_logs", return_value=[])
-@patch("sarafan.contract.service.EthereumNodeClient.block_number", side_effect=[0, 1, 2])
+@patch("sarafan.contract.service.EthereumNodeClient.block_number", side_effect=[0, 1, 2, 3, 4, 5, 6, 7])
 async def test_process_new_publications(
     resolve_mock,
     get_logs_mock,
@@ -35,7 +35,7 @@ async def test_process_new_publications(
     app = Application()
     await app.start()
     Publication = app.contract.content.contract.event('Publication')
-    pub = Publication(reply_to=rnd_hash()[2:], magnet=rnd_hash()[2:], source=rnd_address(), size=1024, retention=12)
+    pub = Publication(reply_to=rnd_hash()[2:], magnet=rnd_hash()[2:].encode(), source=rnd_address(), size=1024, retention=12)
     await app.publications_queue.put(pub)
     await asyncio.sleep(0)
     assert app.running

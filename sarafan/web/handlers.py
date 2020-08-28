@@ -213,6 +213,7 @@ async def create_post(request):
     # TODO: publish in another step
     if 'privateKey' in d:
         await request.app['sarafan'].publish(target_path, post_magnet, d['privateKey'])
+    log.info("Finish .publish()")
     return web.json_response({
         "magnet": post_magnet,
         "size": size,

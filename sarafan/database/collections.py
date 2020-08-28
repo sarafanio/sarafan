@@ -50,15 +50,17 @@ class Collection(Generic[T]):
     async def store(self, obj: T):
         """Store object in database.
         """
-        with self.db as db:
-            values = self.mapper.get_insert_data(obj)
-            fields = ', '.join(values.keys())
-            subs = ','.join(['?'] * len(values))
-            query = f"INSERT INTO {self.table_name} ({fields}) VALUES ({subs})"
-            cursor = db.cursor()
-            log.debug("Store %s with insert query `%s` and args %s", obj, query, values.values())
-            cursor.execute(query, list(values.values()))
-            db.commit()
+        try:
+            with self.db as db:
+                values = self.mapper.get_insert_data(obj)
+                fields = ', '.join(values.keys())
+                subs = ','.join(['?'] * len(values))
+                query = f"INSERT INTO {self.table_name} ({fields}) VALUES ({subs})"
+                cursor = db.cursor()
+                log.debug("Store %s with insert query `%s` and args %s", obj, query, values.values())
+                cursor.execute(query, list(values.values()))
+        except Exception:
+            log.exception("Failed to store post")
 
 
 class PublicationsCollection(Collection[Publication]):

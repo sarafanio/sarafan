@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Callable, Coroutine, List, Optional
@@ -6,6 +7,7 @@ from urllib.parse import urljoin
 import aiohttp
 from aiohttp import ClientResponseError, StreamReader
 from aiohttp.client import ClientSession, ClientTimeout
+from aiohttp_socks import ProxyConnector, ProxyError, ProxyTimeoutError
 
 from ..magnet import magnet_path
 from .peer import Peer
@@ -71,10 +73,13 @@ class PeerClient:
 
     _session: ClientSession
 
-    def __init__(self, peer: Peer, http_proxy: str = "http://127.0.0.1:8118"):
+    # TODO: rename http_proxy -> socks_proxy
+    def __init__(self, peer: Peer, http_proxy: str = "socks5://127.0.0.1:9050"):
         self.peer = peer
         self.http_proxy = http_proxy
+        connector = ProxyConnector.from_url(http_proxy)
         self._session = ClientSession(
+            connector=connector,
             raise_for_status=True,
             timeout=ClientTimeout(
                 total=60, connect=30, sock_read=10
@@ -128,10 +133,13 @@ class PeerClient:
             "magnet": magnet
         }
         log.debug("Making %s discovery request to %s", magnet, self.peer)
-        data = await self._get(self._url('discover'), params=discover_body)
-        if 'match' not in data and 'near' not in data:
-            log.debug("Peer discovery response didn't contain keys `match` or `near`")
-            raise InvalidPeerResponse()
+        try:
+            data = await self._get(self._url('discover'), params=discover_body)
+            if 'match' not in data and 'near' not in data:
+                log.debug("Peer discovery response didn't contain keys `match` or `near`")
+                raise InvalidPeerResponse()
+        except (ProxyError, aiohttp.ClientError, ConnectionError, ProxyTimeoutError) as e:
+            raise InvalidPeerResponse() from e
         result = DiscoveryResult(
             match=data.get('match'),
             near=data.get('near')
@@ -169,11 +177,10 @@ class PeerClient:
         move to the requested destination.
         """
         try:
-            async with self._session.get(self._content_url(magnet_path(magnet)),
-                                         proxy=self.http_proxy) as resp:
+            async with self._session.get(self._content_url(magnet_path(magnet))) as resp:
                 resp.raise_for_status()
                 await store(magnet, resp.content)
-        except aiohttp.ClientError as e:
+        except (aiohttp.ClientError, ProxyError) as e:
             raise DownloadError(magnet) from e
 
     async def has_magnet(self, magnet: str):
@@ -181,10 +188,10 @@ class PeerClient:
         """
         try:
             await self._head(self._content_url(magnet_path(magnet)))
-        except ClientResponseError as e:
-            if e.status == 404:
-                return False
-            raise
+        except (ClientResponseError, ProxyError, ConnectionError):
+            # if e.status == 404:
+            #     return False
+            return False
         return True
 
     @property
@@ -202,7 +209,9 @@ class PeerClient:
     def _url(self, uri):
         """Build url for peer.
         """
-        return urljoin(f'http://{self.peer.service_id}.onion', uri)
+        val = urljoin(f'http://{self.peer.service_id}.onion', uri)
+        log.debug("Main service url: %s", val)
+        return val
 
     def _content_url(self, uri):
         """Build url for peer's content node.
@@ -212,6 +221,7 @@ class PeerClient:
                 f'http://{self.peer.content_service_id}.onion',
                 uri
             )
+        log.debug("Content url: %s", self._url(uri))
         return self._url(uri)
 
     async def _get(self, *args, **kwargs):
@@ -225,11 +235,10 @@ class PeerClient:
 
     async def _request(self, method, *args, **kwargs):
         try:
-            kwargs['proxy'] = self.http_proxy
             async with getattr(self._session, method)(*args, **kwargs) as response:
                 await self._handle_errors(response)
                 return await response.json()
-        except aiohttp.ClientConnectionError as e:
+        except (aiohttp.ClientConnectionError, ProxyError, asyncio.TimeoutError, ProxyTimeoutError) as e:
             raise ConnectionError from e
 
     async def _handle_errors(self, response):

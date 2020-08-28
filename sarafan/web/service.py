@@ -104,7 +104,7 @@ class WebService(Service):
     async def start(self):
         await super().start()
 
-        webapp = web.Application(debug=True)
+        webapp = web.Application()
         webapp['sarafan'] = self.app
 
         cors = aiohttp_cors.setup(webapp, defaults={
