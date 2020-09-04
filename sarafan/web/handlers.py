@@ -170,12 +170,10 @@ async def awards(request):
 
 async def post_list(request):
     """List of posts.
-
-
     """
     cursor = request.query.get('cursor')
     posts, next_cursor = request.app['sarafan'].app.db.posts.all(cursor=cursor)
-    log.info("Posts received: %s", posts)
+    log.debug("Posts received: %s", posts)
     return web.json_response({
         "result": [
             post.to_dict() for post in posts
@@ -261,6 +259,5 @@ def setup_routes(app, cors, node=True, content_path=None, client=True):
         ])
     # Configure CORS on all routes.
     for route in list(app.router.routes()):
-        log.info("Add %s to cors", route)
         cors.add(route)
     return app

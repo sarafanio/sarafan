@@ -9,6 +9,7 @@ from .post_service import PostService
 from ..ethereum import Contract, EthereumNodeClient
 from .abi import CONTENT_CONTRACT, PEERING_CONTRACT, TOKEN_CONTRACT
 from .event_service import ContractEventService
+from ..events import Publication, NewPeer
 
 
 class ContractService(Service):
@@ -109,7 +110,14 @@ class ContractService(Service):
         if self.content_address is None:
             self.content_address = await self._resolve_contract_address('getContentContract')
         self.content = ContractEventService(
-            self.eth, Contract(self.content_address, CONTENT_CONTRACT['abi'])
+            self.eth,
+            Contract(
+                self.content_address,
+                CONTENT_CONTRACT['abi'],
+                event_classes={
+                    'Publication': Publication,
+                }
+            ),
         )
         self.log.debug("Content ContractEventService created")
 
@@ -124,7 +132,13 @@ class ContractService(Service):
             self.peering_address = await self._resolve_contract_address('getPeeringContract')
         self.peering = ContractEventService(
             self.eth,
-            Contract(self.peering_address, PEERING_CONTRACT['abi'])
+            Contract(
+                self.peering_address,
+                PEERING_CONTRACT['abi'],
+                event_classes={
+                    'NewPeer': NewPeer,
+                }
+            ),
         )
         self.log.debug("Peering ContractEventService created")
 

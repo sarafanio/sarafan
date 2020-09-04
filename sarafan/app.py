@@ -5,8 +5,7 @@ from asyncio import StreamReader
 from typing import Dict, List
 
 import configargparse
-
-from core_service import Service, requirements, task
+from core_service import Service, requirements, task, listener
 from eth_account import Account
 
 from sarafan.bundle.bundle import ContentBundle
@@ -17,16 +16,17 @@ from sarafan.download import DownloadService, Download, DownloadStatus
 from sarafan.logging_helpers import setup_logging
 from sarafan.magnet import is_magnet
 from sarafan.models import Post, Publication
+from sarafan.events import Publication as PublicationEvent, NewPeer
 from sarafan.onion.controller import HiddenServiceController
 from sarafan.peering import Peer
 from sarafan.peering.service import PeeringService
-from sarafan.onion.service import OnionService
 from sarafan.storage import StorageService
 from sarafan.web import WebService
 from sarafan.web.service import AbstractApplicationInterface
 
 
 argparser = configargparse.get_argument_parser()
+
 argparser.add_argument("--token", help="Sarafan token contract address",
                        default="0x957D0b2E4afA74A49bbEa4d7333D13c0b11af60F")
 argparser.add_argument("--db", help="sqlite database path",
@@ -68,8 +68,6 @@ class Application(Service):
 
     contract: ContractService
 
-    #: queue with new publications from blockchain
-    publications_queue: asyncio.Queue
     #: queue with NewPeer events from contract
     new_peers_queue: asyncio.Queue
 
@@ -85,7 +83,6 @@ class Application(Service):
 
         self.log.info("Content path: %s", self.conf.content_path)
 
-        self.publications_queue = asyncio.Queue()
         self.new_peers_queue = asyncio.Queue()
 
         self.db = DatabaseService(database=self.conf.db)
@@ -117,15 +114,6 @@ class Application(Service):
     async def app_req(self):
         # resolve contract service before accessing contracts
         await self.contract.resolve()
-        content_contract = self.contract.content.contract
-
-        # subscribe to publications from content contract
-        Publication = content_contract.event('Publication')
-        self.contract.content.subscribe(Publication, queue=self.publications_queue)
-
-        # Subscribe to new peers from peering contract
-        NewPeer = self.contract.peering.contract.event('NewPeer')
-        self.contract.peering.subscribe(NewPeer, queue=self.new_peers_queue)
 
         services = [
             self.contract,
@@ -151,13 +139,10 @@ class Application(Service):
                           "private key are not provided")
         return services
 
-    @task()
-    async def process_new_publications(self):
+    @listener(PublicationEvent)
+    async def process_new_publications(self, publication: PublicationEvent):
         """Process new publications from blockchain.
         """
-        publication = await self.publications_queue.get()
-        # magnet received as bytes32, it would be better to decode it inside event service
-        publication.magnet = publication.magnet.hex()
         self.log.debug("New publication received from contract %s", publication)
         if await self.db.publications.get(publication.magnet):
             self.log.debug("Publication %s already created in the database, just reschedule "
@@ -168,7 +153,6 @@ class Application(Service):
         # TODO: check if it already downloaded
         # TODO: check if it is downloaded but not parsed yet, submit to parse
         await self.downloads.add(publication.magnet)
-        self.publications_queue.task_done()
 
     @task()
     async def process_finished_downloads(self):
@@ -187,13 +171,15 @@ class Application(Service):
         self.log.debug("Post stored in the database %s", post)
         self.downloads.finished.task_done()
 
-    @task()
-    async def process_new_peers(self):
-        new_peer_event = await self.new_peers_queue.get()
-        self.log.info("New peer received from contract %s", new_peer_event)
-        peer = Peer(service_id=new_peer_event.hostname.decode())
+    @listener(NewPeer)
+    async def process_new_peers(self, new_peer_event: NewPeer):
+        """Process new peer events from the contract.
+
+        :param new_peer_event: NewPeer instance
+        """
+        self.log.debug("New peer received from contract %s", new_peer_event)
+        peer = Peer(service_id=new_peer_event.hostname, address=new_peer_event.addr)
         await self.peering.add_peer(peer)
-        self.new_peers_queue.task_done()
 
 
 class WebAppInterface(AbstractApplicationInterface):
@@ -267,3 +253,10 @@ class WebAppInterface(AbstractApplicationInterface):
         # distribute file over network
         # await self.app.peering.distribute(target_filename, magnet)
         self.app.log.info("Finish publishing")
+
+    async def post_list(self, cursor=None):
+        """Return posts list for API endpoint.
+
+        :param cursor: return posts starting from position defined by cursor
+        """
+        return self.app.db.posts.all(cursor=cursor)

@@ -36,7 +36,7 @@ async def test_process_new_publications(
     await app.start()
     Publication = app.contract.content.contract.event('Publication')
     pub = Publication(reply_to=rnd_hash()[2:], magnet=rnd_hash()[2:].encode(), source=rnd_address(), size=1024, retention=12)
-    await app.publications_queue.put(pub)
+    await app.dispatch(pub)
     await asyncio.sleep(0)
     assert app.running
     await app.stop()

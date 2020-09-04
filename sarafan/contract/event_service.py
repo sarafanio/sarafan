@@ -93,6 +93,7 @@ class ContractEventService(Service):
         return queue
 
     async def notify_subscribers(self, contract_event: BaseContractEvent):
+        await self.emit(contract_event)
         for queue in self._subscriptions.get(contract_event.__class__, []):
             await queue.put(contract_event)
         listener_count = len(self._subscriptions.get(contract_event.__class__, []))

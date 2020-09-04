@@ -1,7 +1,7 @@
 import re
 import logging
 from dataclasses import make_dataclass, field, fields, dataclass
-from typing import Dict, List, Type, Union
+from typing import Dict, List, Type, Union, Optional
 
 from Cryptodome.Hash import keccak
 from eth_abi import decode_abi, decode_single, encode_abi, encode_single
@@ -113,6 +113,12 @@ class BaseContractEvent:
         data.update(dict(zip(field_names, decoded)))
         # convert camel-case event property names to snake-case
         snake_data = {camel_to_snake(key): value for key, value in data.items()}
+        # apply fields transformations
+        for f in fields(cls):
+            if f.metadata.get("abi_hex_bytes"):
+                snake_data[f.name] = snake_data[f.name].hex()
+            elif f.metadata.get("abi_ascii_bytes"):
+                snake_data[f.name] = snake_data[f.name].decode('ascii')
         return cls(**snake_data)
 
     @classmethod
@@ -214,12 +220,16 @@ class Contract:
     #: mapping of abi method signature hash to event type
     signatures: Dict[str, Type[BaseContractEvent]]
 
-    def __init__(self, address: str, abi: List):
+    def __init__(self,
+                 address: str,
+                 abi: List,
+                 event_classes: Optional[Dict[str, Type[BaseContractEvent]]] = None):
         self.event_types = {}
         self.signatures = {}
         self.address = address
         self.abi = abi
         self.contract_methods = {}
+        self.event_types = event_classes or {}
         self._create_event_classes()
 
     def event(self, name) -> Type[BaseContractEvent]:
@@ -246,29 +256,31 @@ class Contract:
         for item in self.abi:
             item_type = item.get("type")
             if item_type == "event":
-                cls_fields = []
-                for input in item["inputs"]:
-                    field_type = ETH_TO_DATACLASS_TYPE[input["type"]]
-                    cls_field_name = camel_to_snake(input["name"])
-                    # prepend python keywords with underscore
-                    if cls_field_name in ("from",):
-                        cls_field_name = "_%s" % cls_field_name
-                    cls_fields.append(
-                        (
-                            cls_field_name,
-                            field_type,
-                            field(
-                                metadata={
-                                    "abi_name": input["name"],
-                                    "abi_indexed": input["indexed"],
-                                    "abi_type": input["type"],
-                                }
-                            ),
+                event_type = self.event_types.get(item.get('name'))
+                if not event_type:
+                    cls_fields = []
+                    for input in item["inputs"]:
+                        field_type = ETH_TO_DATACLASS_TYPE[input["type"]]
+                        cls_field_name = camel_to_snake(input["name"])
+                        # prepend python keywords with underscore
+                        if cls_field_name in ("from",):
+                            cls_field_name = "_%s" % cls_field_name
+                        cls_fields.append(
+                            (
+                                cls_field_name,
+                                field_type,
+                                field(
+                                    metadata={
+                                        "abi_name": input["name"],
+                                        "abi_indexed": input["indexed"],
+                                        "abi_type": input["type"],
+                                    }
+                                ),
+                            )
                         )
+                    event_type = make_dataclass(
+                        item["name"], cls_fields, bases=(BaseContractEvent,)
                     )
-                event_type = make_dataclass(
-                    item["name"], cls_fields, bases=(BaseContractEvent,)
-                )
                 self.event_types[item["name"]] = event_type
                 setattr(self, item["name"], event_type)
                 log.debug(
