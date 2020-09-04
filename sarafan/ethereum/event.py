@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List
 
 
@@ -29,3 +29,27 @@ class Event:
             data=raw["data"],
             topics=raw["topics"],
         )
+
+
+def event_field(name, abi_type, indexed=False, hex_bytes=False, ascii_bytes=False):
+    """Define field of the ethereum contract on the dataclass.
+
+    You can't set `hex_bytes` and `ascii_bytes` at the same time.
+
+    TODO: move to contract module
+    TODO: class-based Field approach might look better
+
+    :param name: field name in the abi
+    :param abi_type: abi type
+    :param indexed: indexed field or not
+    :param hex_bytes: if True, bytes will be decoded to hex with 0x prefix
+    :param ascii_bytes: if True, bytes will be decoded to ascii
+    :return: field with abi metadata
+    """
+    return field(metadata={
+        "abi_name": name,
+        "abi_type": abi_type,
+        "abi_indexed": indexed,
+        "abi_hex_bytes": hex_bytes,
+        "abi_ascii_bytes": ascii_bytes,
+    })
