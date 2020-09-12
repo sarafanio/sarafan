@@ -11,6 +11,7 @@ TODO:
 
 TODO:
 
+* comments
 * node's account generation
 * handle transfer to account, convert submitted amount to SRFN
 * post and handle Awards
@@ -18,19 +19,19 @@ TODO:
 ## v0.1.0 - Initial release
 
 Minimal version which allows to exchange content between multiple nodes. 
-Also provides a minimal reader UI.
+Also provides a minimal UI.
 
-* discover posts and comments from blockchain
-* store posts
+* discover bundles found on the blockchain
+* store downloaded posts
 * discover new peers from blockchain
-* discover and download content by magnet
-
-TODO:
-
-* start onion service and handle requests
-* store new comments
+* discover and download content by magnet ?
 * announce node with NewPeer event
 * pack and publish posts and comments
 * basic UI
-* store discovered peers in db
+* start onion service and handle requests
+
+TODO:
+
+* store discovered peers
 * work with eth node over tor (and allow to configure for local node)
+* security check (only tor used to communicate)

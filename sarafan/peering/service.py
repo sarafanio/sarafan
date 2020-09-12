@@ -10,11 +10,12 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from itertools import chain
-from typing import List, Dict, AsyncGenerator
+from typing import List, Dict, AsyncGenerator, Set
 
 from aiohttp_socks import ProxyError
-from core_service import Service, task
+from core_service import Service, task, listener
 
+from ..events import NewPeer, DiscoveryRequest, DiscoveryFinished, DiscoveryFailed
 from ..distance import ascii_to_hash_distance
 
 from .peer import Peer
@@ -24,25 +25,39 @@ log = logging.getLogger(__name__)
 
 
 class MagnetNotDiscovered(Exception):
+    """Exception raised if content for requested magnet can't be found.
+    """
     pass
 
 
 @dataclass
 class DistributionTask:
+    """Content distribution task definition.
+    """
     filename: str
     magnet: str
 
 
 class PeeringService(Service):
-    """Sarafan p2p network service.
+
+    """Sarafan peering service.
 
     Manage peer list and update their status. Provide discovery functionality.
+
+    Consumes DiscoveryRequest events and produces DiscoveryResult events in response.
+
+    Consumes NewPeer events to populate peers collection with new peers from blockchain.
+    Internal peer collection also populated with peers found while discovering magnets
+    and communicating with other nodes.
+
+    Periodically update known peers status.
     """
+
     #: maximum number of in-memory peers
     max_peer_count: int = 1000
     #: peers by service_id
     peers: Dict[str, Peer]
-    #: list of peers sorted
+    #: list of peers sorted by rating
     peers_by_rating: List[Peer]
 
     #: mapping of service id to client instance
@@ -97,7 +112,10 @@ class PeeringService(Service):
         return sorted(self.peers_by_rating[:max_count],
                       key=lambda x: ascii_to_hash_distance(x.service_id, magnet))
 
-    async def discover(self, magnet: str, max_depth: int = 20) -> AsyncGenerator[PeerClient, None]:
+    async def discover(self,
+                       magnet: str,
+                       max_depth: int = 20,
+                       visited_peers: Set[Peer] = None) -> AsyncGenerator[Peer, None]:
         """Search for magnet location.
 
         0. Check if we know more than one peer
@@ -107,7 +125,8 @@ class PeeringService(Service):
         2. return service id containing file or repeat while no new peers received
         3. raise MagnetNotDiscovered if service id not found and there is no new peers to discover
         """
-        visited_peers = set()
+        if visited_peers is None:
+            visited_peers = set()
         for _ in range(max_depth + 1):
             for i, peer in enumerate(self.peers_by_distance(magnet)):
                 if peer in visited_peers:
@@ -162,6 +181,35 @@ class PeeringService(Service):
                 break
         log.info("Content bundle %s distributed to %i nodes",
                  task.magnet, success_upload_count)
+
+    @listener(NewPeer)
+    async def handle_new_peers(self, new_peer: NewPeer):
+        """Listen for new peers from the blockchain.
+        """
+        self.log.debug("New peer received from contract %s", new_peer)
+        peer = Peer(service_id=new_peer.hostname, address=new_peer.addr)
+        await self.add_peer(peer)
+
+    @listener(DiscoveryRequest)
+    async def handle_discovery_request(self, request: DiscoveryRequest):
+        """DiscoveryRequest handler.
+
+        Emit DiscoveryFinished in case of success and DiscoveryFailed in other case.
+        """
+        magnet = request.publication.magnet
+        visited_peers = request.state.visited_peers
+        async for peer in self.discover(magnet, visited_peers=visited_peers):
+            await self.emit(DiscoveryFinished(
+                publication=request.publication,
+                peer=peer,
+                url="example",  # FIXME
+                state=request.state
+            ))
+            return peer
+        await self.emit(DiscoveryFailed(
+            publication=request.publication,
+            state=request.state
+        ))
 
     async def _cleanup_peers(self):
         """Remove peers exceeding max peers limit.

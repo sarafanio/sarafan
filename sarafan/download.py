@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 import time
 from typing import Callable, AsyncGenerator, Optional, List
 
-from core_service import Service, task
+from core_service import Service, task, listener
 
+from .events import DiscoveryFinished
 from .peering import PeerClient, Peer
 from .peering.client import InvalidChecksum, DownloadError
 from .peering.service import MagnetNotDiscovered
@@ -88,12 +89,17 @@ class DownloadService(Service):
         """Add magnet to download queue.
         """
         obj = Download(magnet)
-        await self.download_queue.put(obj)
+        # await self.download_queue.put(obj)
 
-    async def download(self, download: Download):
-        """Actually download magnet.
+    @listener(DiscoveryFinished)
+    async def finished_discovery_handler(self, download: DiscoveryFinished):
+        """DiscoveryFinished event handler.
+
+        Start download content bundle from discovered peer.
+
+        Emit
         """
-        magnet = download.magnet
+        magnet = download.publication.magnet
         download.status = DownloadStatus.DISCOVERY
         try:
             async for client in self.discovery(magnet):

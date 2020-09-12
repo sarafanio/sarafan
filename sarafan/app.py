@@ -15,8 +15,7 @@ from sarafan.database.service import DatabaseService
 from sarafan.download import DownloadService, Download, DownloadStatus
 from sarafan.logging_helpers import setup_logging
 from sarafan.magnet import is_magnet
-from sarafan.models import Post, Publication
-from sarafan.events import Publication as PublicationEvent, NewPeer
+from sarafan.events import Publication as PublicationEvent, NewPeer, Publication, Post
 from sarafan.onion.controller import HiddenServiceController
 from sarafan.peering import Peer
 from sarafan.peering.service import PeeringService
@@ -68,9 +67,6 @@ class Application(Service):
 
     contract: ContractService
 
-    #: queue with NewPeer events from contract
-    new_peers_queue: asyncio.Queue
-
     def __init__(self, argv=None, **kwargs):
         super().__init__(**kwargs)
         self.argv = argv or sys.argv
@@ -82,8 +78,6 @@ class Application(Service):
         os.makedirs(self.conf.content_path, exist_ok=True)
 
         self.log.info("Content path: %s", self.conf.content_path)
-
-        self.new_peers_queue = asyncio.Queue()
 
         self.db = DatabaseService(database=self.conf.db)
         self.contract = ContractService(
@@ -103,7 +97,7 @@ class Application(Service):
             client_api=self.conf.client_app,
             content_path=self.conf.content_path,
         )
-        # TODO: store and restore keys in order to preserve servece_id between restarts
+        # TODO: store and restore keys in order to preserve service_id between restarts
         self.hidden_service = HiddenServiceController(
             app_port=self.conf.web_port,
             stem_host=self.conf.tor_host,
@@ -170,16 +164,6 @@ class Application(Service):
         await self.db.posts.store(post)
         self.log.debug("Post stored in the database %s", post)
         self.downloads.finished.task_done()
-
-    @listener(NewPeer)
-    async def process_new_peers(self, new_peer_event: NewPeer):
-        """Process new peer events from the contract.
-
-        :param new_peer_event: NewPeer instance
-        """
-        self.log.debug("New peer received from contract %s", new_peer_event)
-        peer = Peer(service_id=new_peer_event.hostname, address=new_peer_event.addr)
-        await self.peering.add_peer(peer)
 
 
 class WebAppInterface(AbstractApplicationInterface):

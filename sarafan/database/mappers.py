@@ -1,7 +1,7 @@
 from dataclasses import fields
 from typing import TypeVar, Generic, Type, Dict
 
-from sarafan.models import Post, Publication
+from sarafan.events import Publication, Post
 
 T = TypeVar('T')
 

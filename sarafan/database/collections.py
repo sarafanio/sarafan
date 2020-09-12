@@ -4,7 +4,7 @@ from base64 import b64decode, b64encode
 from typing import TypeVar, Generic
 from urllib.parse import parse_qs, urlencode
 
-from ..models import Publication, Post
+from ..events import Publication, Post
 
 from .mappers import AbstractMapper, DataclassMapper, PostMapper, PublicationMapper
 
