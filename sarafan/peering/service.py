@@ -175,22 +175,24 @@ class PeeringService(Service):
                     client = self.get_client(peer)
 
                     try:
-                        # # TODO: we can check for magnet and discover in parallel
-                        # new_peers = await client.discover(magnet)
-                        # for p in chain(new_peers.match, new_peers.near):
-                        #     if p.service_id not in self.peers:
-                        #         await self.add_peer(p)
+                        # TODO: we can check for magnet and discover in parallel
+                        new_peers = await client.discover(magnet)
+                        for p in chain(new_peers.match, new_peers.near):
+                            if p.service_id not in self.peers:
+                                await self.add_peer(p)
                         has_magnet = await client.has_magnet(magnet)
                         if has_magnet:
                             await self.emit(DiscoveryFinished(
                                 publication=request.publication,
                                 peer=peer,
-                                url="example",  # FIXME
+                                url=client.download_url(magnet),
                                 state=request.state
                             ))
                             return peer
                     except (InvalidPeerResponse, ProxyError):  # pragma: no cover
                         continue
+                    finally:
+                        await client.close()
         finally:
             await self.emit(DiscoveryFailed(
                 publication=request.publication,

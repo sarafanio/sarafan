@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Coroutine, List, Optional
 from urllib.parse import urljoin
 
@@ -51,8 +51,8 @@ class InvalidChecksum(DownloadError):
 
 @dataclass
 class DiscoveryResult:
-    match: List[Peer]
-    near: List[Peer]
+    match: List[Peer] = field(default_factory=list)
+    near: List[Peer] = field(default_factory=list)
 
 
 class HelloResult:
@@ -177,7 +177,7 @@ class PeerClient:
         move to the requested destination.
         """
         try:
-            async with self._session.get(self._content_url(magnet_path(magnet))) as resp:
+            async with self._session.get(self.download_url(magnet)) as resp:
                 resp.raise_for_status()
                 await store(magnet, resp.content)
         except (aiohttp.ClientError, ProxyError) as e:
@@ -193,6 +193,9 @@ class PeerClient:
             #     return False
             return False
         return True
+
+    def download_url(self, magnet):
+        return self._content_url(magnet_path(magnet))
 
     @property
     def closed(self):

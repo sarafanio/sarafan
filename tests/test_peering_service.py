@@ -7,6 +7,7 @@ from async_timeout import timeout
 from sarafan.events import NewPeer, DiscoveryRequest, Publication, DiscoveryFinished, DiscoveryFailed
 from sarafan.models import Peer
 from sarafan.peering import PeeringService, PeerClient
+from sarafan.peering.client import DiscoveryResult
 
 from .utils import generate_rnd_hash, generate_rnd_address
 
@@ -43,6 +44,7 @@ async def test_remove_peer(peering):
     await peering.remove_peer(peer)
     peers_list = list(peering.peers_by_distance(generate_rnd_hash()))
     assert len(peers_list) == 0
+    await client.close()
 
 
 @pytest.mark.asyncio
@@ -74,7 +76,8 @@ async def test_peer_cleanup(peering):
 
 @pytest.mark.asyncio
 @mock.patch('sarafan.peering.service.PeerClient.has_magnet', side_effect=[True])
-async def test_handle_discovery_request(has_magnet_mock, peering: PeeringService):
+@mock.patch('sarafan.peering.service.PeerClient.discover', return_value=DiscoveryResult())
+async def test_handle_discovery_request(has_magnet_mock, discover_mock, peering: PeeringService):
     peer = Peer(service_id='fake_discovery')
     await peering.add_peer(peer)
     publication = Publication(
@@ -96,7 +99,8 @@ async def test_handle_discovery_request(has_magnet_mock, peering: PeeringService
 
 @pytest.mark.asyncio
 @mock.patch('sarafan.peering.service.PeerClient.has_magnet', side_effect=[False])
-async def test_discovery_failed(has_magnet_mock, peering: PeeringService):
+@mock.patch('sarafan.peering.service.PeerClient.discover', return_value=DiscoveryResult())
+async def test_discovery_failed(has_magnet_mock, discover_mock, peering: PeeringService):
     peer = Peer(service_id="fail_discovery")
     await peering.add_peer(peer)
     publication = Publication(
