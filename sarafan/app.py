@@ -86,7 +86,6 @@ class Application(Service):
         self.peering = PeeringService()
         self.storage = StorageService(base_path=self.conf.content_path)
         self.downloads = DownloadService(
-            discovery=self.peering.discover,
             storage=self.storage
         )
         self.web = WebService(

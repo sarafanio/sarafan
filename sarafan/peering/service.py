@@ -115,44 +115,6 @@ class PeeringService(Service):
         return sorted(self.peers_by_rating[:max_count],
                       key=lambda x: ascii_to_hash_distance(x.service_id, magnet))
 
-    async def discover(self,
-                       magnet: str,
-                       max_depth: int = 20,
-                       visited_peers: Set[Peer] = None) -> AsyncGenerator[Peer, None]:
-        """Search for magnet location.
-
-        0. Check if we know more than one peer
-        1. Get nearest peer from already known
-        2a. Request peer for content
-        3b. Request list of other peers
-        2. return service id containing file or repeat while no new peers received
-        3. raise MagnetNotDiscovered if service id not found and there is no new peers to discover
-        """
-        if visited_peers is None:
-            visited_peers = set()
-        for _ in range(max_depth + 1):
-            for i, peer in enumerate(self.peers_by_distance(magnet)):
-                if peer in visited_peers:
-                    continue
-                visited_peers.add(peer)
-
-                client = self.get_client(peer)
-
-                try:
-                    has_magnet = await client.has_magnet(magnet)
-                    if has_magnet:
-                        yield peer
-
-                    new_peers = await client.discover(magnet)
-                except (InvalidPeerResponse, ProxyError):
-                    continue
-
-                for p in chain(new_peers.match, new_peers.near):
-                    if p.service_id not in self.peers:
-                        await self.add_peer(p)
-
-        raise MagnetNotDiscovered("Reach limit of network search depth")
-
     async def distribute(self, filename, magnet):
         """Schedule distribution of provided content bundle.
         """
@@ -201,18 +163,39 @@ class PeeringService(Service):
         """
         magnet = request.publication.magnet
         visited_peers = request.state.visited_peers
-        async for peer in self.discover(magnet, visited_peers=visited_peers):
-            await self.emit(DiscoveryFinished(
+        max_depth = 25
+
+        try:
+            for _ in range(max_depth + 1):
+                for i, peer in enumerate(self.peers_by_distance(magnet)):
+                    if peer in visited_peers:
+                        continue
+                    visited_peers.add(peer)
+
+                    client = self.get_client(peer)
+
+                    try:
+                        # # TODO: we can check for magnet and discover in parallel
+                        # new_peers = await client.discover(magnet)
+                        # for p in chain(new_peers.match, new_peers.near):
+                        #     if p.service_id not in self.peers:
+                        #         await self.add_peer(p)
+                        has_magnet = await client.has_magnet(magnet)
+                        if has_magnet:
+                            await self.emit(DiscoveryFinished(
+                                publication=request.publication,
+                                peer=peer,
+                                url="example",  # FIXME
+                                state=request.state
+                            ))
+                            return peer
+                    except (InvalidPeerResponse, ProxyError):  # pragma: no cover
+                        continue
+        finally:
+            await self.emit(DiscoveryFailed(
                 publication=request.publication,
-                peer=peer,
-                url="example",  # FIXME
                 state=request.state
             ))
-            return peer
-        await self.emit(DiscoveryFailed(
-            publication=request.publication,
-            state=request.state
-        ))
 
     async def _cleanup_peers(self):
         """Remove peers exceeding max peers limit.

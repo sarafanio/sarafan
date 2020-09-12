@@ -62,8 +62,6 @@ class DownloadService(Service):
 
     Clients should listen to `finished` queue for download status.
     """
-    #: discovery function
-    discovery: Callable[[str], AsyncGenerator[PeerClient, None]]
     #: storage service instance
     storage: StorageService
 
@@ -75,11 +73,9 @@ class DownloadService(Service):
     failed: asyncio.Queue
 
     def __init__(self,
-                 discovery: Callable[[str], AsyncGenerator[PeerClient, None]],
                  storage: StorageService,
                  **kwargs):
         super().__init__(**kwargs)
-        self.discovery = discovery
         self.storage = storage
 
         self.download_queue = asyncio.Queue()
@@ -93,14 +89,14 @@ class DownloadService(Service):
         await self.download_queue.put(obj)
 
     @listener(DiscoveryFinished)
-    async def finished_discovery_handler(self, download: DiscoveryFinished):
+    async def finished_discovery_handler(self, event: DiscoveryFinished):
         """DiscoveryFinished event handler.
 
         Start download content bundle from discovered peer.
 
         Emit
         """
-        magnet = download.publication.magnet
+        magnet = event.publication.magnet
         download.status = DownloadStatus.DISCOVERY
         try:
             async for client in self.discovery(magnet):

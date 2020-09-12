@@ -1,7 +1,10 @@
-import pytest
-import asyncio
+from typing import AsyncGenerator
+from unittest import mock
 
-from sarafan.events import NewPeer
+import pytest
+from async_timeout import timeout
+
+from sarafan.events import NewPeer, DiscoveryRequest, Publication, DiscoveryFinished, DiscoveryFailed
 from sarafan.models import Peer
 from sarafan.peering import PeeringService, PeerClient
 
@@ -12,7 +15,7 @@ MAX_PEERS = 10
 
 
 @pytest.fixture(name='peering')
-async def peering_service():
+async def peering_service() -> AsyncGenerator[PeeringService, None]:
     peering = PeeringService(max_peer_count=MAX_PEERS)
     await peering.start()
     try:
@@ -67,3 +70,47 @@ async def test_peer_cleanup(peering):
     peers_list = list(peering.peers.values())
     assert len(peers_list) == MAX_PEERS
     assert first_peer not in peers_list
+
+
+@pytest.mark.asyncio
+@mock.patch('sarafan.peering.service.PeerClient.has_magnet', side_effect=[True])
+async def test_handle_discovery_request(has_magnet_mock, peering: PeeringService):
+    peer = Peer(service_id='fake_discovery')
+    await peering.add_peer(peer)
+    publication = Publication(
+        reply_to='0x',
+        magnet=generate_rnd_hash()[2:],
+        source=generate_rnd_address(),
+        size=1,
+        retention=1
+    )
+    discovery_request = DiscoveryRequest(publication=publication)
+    service_bus = peering.bus
+    queue = service_bus.subscribe(DiscoveryFinished)
+    await peering.dispatch(discovery_request)
+    with timeout(1):
+        event: DiscoveryFinished = await queue.get()
+        assert event.publication == publication
+    assert has_magnet_mock.called_once()
+
+
+@pytest.mark.asyncio
+@mock.patch('sarafan.peering.service.PeerClient.has_magnet', side_effect=[False])
+async def test_discovery_failed(has_magnet_mock, peering: PeeringService):
+    peer = Peer(service_id="fail_discovery")
+    await peering.add_peer(peer)
+    publication = Publication(
+        reply_to='0x',
+        magnet=generate_rnd_hash()[2:],
+        source=generate_rnd_address(),
+        size=1,
+        retention=1
+    )
+    discovery_request = DiscoveryRequest(publication=publication)
+    service_bus = peering.bus
+    queue = service_bus.subscribe(DiscoveryFailed)
+    await peering.dispatch(discovery_request)
+    with timeout(1):
+        event: DiscoveryFailed = await queue.get()
+        assert event.publication == publication
+    assert has_magnet_mock.called_once()
