@@ -10,7 +10,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from itertools import chain
-from typing import List, Dict, AsyncGenerator, Set
+from typing import List, Dict
 
 from aiohttp_socks import ProxyError
 from core_service import Service, task, listener
