@@ -1,14 +1,16 @@
 from typing import AsyncGenerator
 from unittest import mock
+from asyncio.exceptions import TimeoutError
 
 import pytest
 from async_timeout import timeout
 
-from sarafan.events import NewPeer, DiscoveryRequest, Publication, DiscoveryFinished, DiscoveryFailed
+from sarafan.events import NewPeer, DiscoveryRequest, DiscoveryFinished, DiscoveryFailed
 from sarafan.models import Peer
 from sarafan.peering import PeeringService, PeerClient
 from sarafan.peering.client import DiscoveryResult
 
+from .factories import PublicationFactory
 from .utils import generate_rnd_hash, generate_rnd_address
 
 
@@ -80,13 +82,7 @@ async def test_peer_cleanup(peering):
 async def test_handle_discovery_request(has_magnet_mock, discover_mock, peering: PeeringService):
     peer = Peer(service_id='fake_discovery')
     await peering.add_peer(peer)
-    publication = Publication(
-        reply_to='0x',
-        magnet=generate_rnd_hash()[2:],
-        source=generate_rnd_address(),
-        size=1,
-        retention=1
-    )
+    publication = PublicationFactory.create()
     discovery_request = DiscoveryRequest(publication=publication)
     service_bus = peering.bus
     queue = service_bus.subscribe(DiscoveryFinished)
@@ -95,6 +91,18 @@ async def test_handle_discovery_request(has_magnet_mock, discover_mock, peering:
         event: DiscoveryFinished = await queue.get()
         assert event.publication == publication
     assert has_magnet_mock.called_once()
+    assert discover_mock.called_once()
+
+    failed_queue = service_bus.subscribe(DiscoveryFailed)
+    await peering.dispatch(DiscoveryRequest(publication=publication, state=event.state))
+    # We should have failure on the second try (because the only node already visited)
+    with timeout(1):
+        event: DiscoveryFailed = await failed_queue.get()
+        assert event.publication == publication
+    # There are should be no DiscoveryFinished events
+    with pytest.raises(TimeoutError):
+        with timeout(0.2):
+            await queue.get()
 
 
 @pytest.mark.asyncio
@@ -103,13 +111,7 @@ async def test_handle_discovery_request(has_magnet_mock, discover_mock, peering:
 async def test_discovery_failed(has_magnet_mock, discover_mock, peering: PeeringService):
     peer = Peer(service_id="fail_discovery")
     await peering.add_peer(peer)
-    publication = Publication(
-        reply_to='0x',
-        magnet=generate_rnd_hash()[2:],
-        source=generate_rnd_address(),
-        size=1,
-        retention=1
-    )
+    publication = PublicationFactory.create()
     discovery_request = DiscoveryRequest(publication=publication)
     service_bus = peering.bus
     queue = service_bus.subscribe(DiscoveryFailed)
@@ -118,3 +120,4 @@ async def test_discovery_failed(has_magnet_mock, discover_mock, peering: Peering
         event: DiscoveryFailed = await queue.get()
         assert event.publication == publication
     assert has_magnet_mock.called_once()
+    assert discover_mock.called_once()

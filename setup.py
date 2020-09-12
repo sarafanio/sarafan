@@ -36,6 +36,7 @@ setup(
             'pytest-cov',
             'pylama',
             'mypy',
+            'factory_boy',
         ]
     }
 )
