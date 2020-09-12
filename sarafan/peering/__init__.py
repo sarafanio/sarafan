@@ -1,7 +1,8 @@
 from .client import PeerClient
-from .peer import Peer
+from ..models import Peer
+from .service import PeeringService
 
 __all__ = (
+    'PeeringService',
     'PeerClient',
-    'Peer',
 )

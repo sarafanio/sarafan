@@ -7,7 +7,8 @@ from typing import Callable, AsyncGenerator, Optional, List
 from core_service import Service, task, listener
 
 from .events import DiscoveryFinished
-from .peering import PeerClient, Peer
+from .peering import PeerClient
+from .models import Peer
 from .peering.client import InvalidChecksum, DownloadError
 from .peering.service import MagnetNotDiscovered
 from .storage import StorageService
@@ -89,7 +90,7 @@ class DownloadService(Service):
         """Add magnet to download queue.
         """
         obj = Download(magnet)
-        # await self.download_queue.put(obj)
+        await self.download_queue.put(obj)
 
     @listener(DiscoveryFinished)
     async def finished_discovery_handler(self, download: DiscoveryFinished):

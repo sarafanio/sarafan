@@ -7,7 +7,7 @@ from aiohttp import web
 
 from core_service import Service
 
-from ..peering import Peer
+from ..models import Peer
 from .handlers import setup_routes
 from .logging import AccessLogger
 

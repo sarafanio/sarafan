@@ -18,7 +18,7 @@ from core_service import Service, task, listener
 from ..events import NewPeer, DiscoveryRequest, DiscoveryFinished, DiscoveryFailed
 from ..distance import ascii_to_hash_distance
 
-from .peer import Peer
+from ..models import Peer
 from .client import PeerClient, InvalidPeerResponse
 
 log = logging.getLogger(__name__)
@@ -65,8 +65,11 @@ class PeeringService(Service):
     #: bundle distribution queue
     _distribution_queue: asyncio.Queue
 
-    def __init__(self, **kwargs):
+    def __init__(self, *, max_peer_count: int = 1000, **kwargs):
         super().__init__(**kwargs)
+
+        self.max_peer_count = max_peer_count
+
         self.peers_by_rating = []
         self.peers = {}
         self._peer_clients = {}
@@ -218,6 +221,9 @@ class PeeringService(Service):
         """
         peers_count = len(self.peers_by_rating)
         if peers_count > self.max_peer_count:
-            delete_count = -peers_count - self.max_peer_count
-            for p in self.peers_by_rating[-delete_count:]:
+            delete_count = peers_count - self.max_peer_count
+            self.log.debug("There are %i peers but %i is a maximum, need to delete %i peers",
+                           peers_count, self.max_peer_count, delete_count)
+            for p in self.peers_by_rating[:delete_count]:
+                self.log.debug("Cleanup peer %s", p)
                 await self.remove_peer(p)

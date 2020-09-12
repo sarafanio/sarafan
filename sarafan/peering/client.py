@@ -10,7 +10,7 @@ from aiohttp.client import ClientSession, ClientTimeout
 from aiohttp_socks import ProxyConnector, ProxyError, ProxyTimeoutError
 
 from ..magnet import magnet_path
-from .peer import Peer
+from ..models import Peer
 
 log = logging.getLogger(__name__)
 

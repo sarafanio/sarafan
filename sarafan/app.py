@@ -17,7 +17,7 @@ from sarafan.logging_helpers import setup_logging
 from sarafan.magnet import is_magnet
 from sarafan.events import Publication as PublicationEvent, NewPeer, Publication, Post
 from sarafan.onion.controller import HiddenServiceController
-from sarafan.peering import Peer
+from sarafan.models import Peer
 from sarafan.peering.service import PeeringService
 from sarafan.storage import StorageService
 from sarafan.web import WebService

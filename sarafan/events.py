@@ -3,13 +3,13 @@
 Any service can subscribe or emit them. Some of the events stored in the database if emitted.
 """
 from dataclasses import dataclass, field
-from typing import List, Set
+from typing import Set
 
 from dataclasses_json import dataclass_json
 
 from .ethereum.contract import BaseContractEvent
 from .ethereum.event import event_field
-from .peering import Peer
+from .models import Peer
 
 
 @dataclass_json
