@@ -106,7 +106,7 @@ class PeeringService(Service):
 
         `max_count` will limit the number of top rated nodes to account.
         """
-        return sorted(self.peers_by_rating[:max_count],
+        return sorted(filter(lambda x: x.rating > 0.1, self.peers_by_rating[:max_count]),
                       key=lambda x: ascii_to_hash_distance(x.service_id, magnet))
 
     async def distribute(self, filename, magnet):
@@ -145,6 +145,11 @@ class PeeringService(Service):
         peer = Peer(service_id=new_peer.hostname, address=new_peer.addr)
         await self.add_peer(peer)
 
+    @listener(Peer)
+    async def restored_peers_listener(self, peer: Peer):
+        if peer.service_id not in self.peers:
+            await self.add_peer(peer)
+
     @listener(DiscoveryRequest)
     async def handle_discovery_request(self, request: DiscoveryRequest):
         """DiscoveryRequest handler.
@@ -167,19 +172,29 @@ class PeeringService(Service):
                     try:
                         # TODO: we can check for magnet and discover in parallel
                         new_peers = await client.discover(magnet)
+                        peer.rating *= 2
+                        await self.emit(peer)
                         for p in chain(new_peers.match, new_peers.near):
                             if p.service_id not in self.peers:
                                 await self.add_peer(p)
                         has_magnet = await client.has_magnet(magnet)
                         if has_magnet:
+                            self.log.info("Peer %s found for magnet %s. DiscoveryFinished",
+                                          peer, magnet)
                             await self.emit(DiscoveryFinished(
                                 publication=request.publication,
                                 peer=peer,
                                 url=client.download_url(magnet),
                                 state=request.state
                             ))
+                            peer.rating = peer.rating * 2
+                            await self.emit(peer)
                             return peer
+                        else:
+                            self.log.info("Peer %s has no magnet %s", peer, magnet)
                     except (InvalidPeerResponse, ProxyError):  # pragma: no cover
+                        peer.rating = peer.rating / 4
+                        await self.emit(peer)
                         continue
                     finally:
                         await client.close()

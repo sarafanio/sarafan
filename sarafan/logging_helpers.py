@@ -20,7 +20,7 @@ class pformat:  # noqa
         return original_pformat(*self.args, **self.kwargs)
 
 
-def setup_logging(level='INFO'):
+def setup_logging(level='INFO', ethereum_level='INFO'):
     logging.config.dictConfig({
         "version": 1,
         "disable_existing_loggers": True,
@@ -42,6 +42,16 @@ def setup_logging(level='INFO'):
                 "handlers": ["console"],
                 "propagate": False,
             },
+            "sarafan.ethereum": {
+                "level": ethereum_level,
+                "handlers": ["console"],
+                "propagate": False,
+            },
+            "sarafan.contract": {
+                "level": ethereum_level,
+                "handlers": ["console"],
+                "propagate": False,
+            },
             "aiohttp.server": {
                 "level": level,
                 "handlers": ["console"],
@@ -51,6 +61,9 @@ def setup_logging(level='INFO'):
                 "level": level,
                 "handlers": ["console"],
                 "propagate": False,
+            },
+            "core_service": {
+                "level": "INFO",
             }
         },
         "root": {

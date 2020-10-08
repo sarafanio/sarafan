@@ -2,6 +2,7 @@ from dataclasses import fields
 from typing import TypeVar, Generic, Type, Dict
 
 from sarafan.events import Publication, Post
+from sarafan.models import Peer
 
 T = TypeVar('T')
 
@@ -36,9 +37,11 @@ class AbstractMapper(Generic[T]):
 
 
 class DataclassMapper(AbstractMapper[T]):
+    only_fields = None
+
     def build_object(self, data) -> T:
         props = {}
-        for field in fields(self.model):
+        for field in self._get_fields():
             col_name = field.name
             if field.metadata and 'db_name' in field.metadata:
                 col_name = field.metadata['db_name']
@@ -47,7 +50,7 @@ class DataclassMapper(AbstractMapper[T]):
 
     def get_insert_data(self, obj: T) -> Dict:
         values = {}
-        for field in fields(self.model):
+        for field in self._get_fields():
             col_name = field.name
             if field.metadata and 'db_name' in field.metadata:
                 col_name = field.metadata['db_name']
@@ -55,6 +58,12 @@ class DataclassMapper(AbstractMapper[T]):
             if v is not None:
                 values[col_name] = v
         return values
+
+    def _get_fields(self):
+        all_fields = fields(self.model)
+        if self.only_fields:
+            return filter(lambda x: x.name in self.only_fields, all_fields)
+        return all_fields
 
 
 class PostMapper(DataclassMapper[Post]):
@@ -71,3 +80,9 @@ class PublicationMapper(DataclassMapper[Publication]):
 
     def get_pk_column(self):
         return 'magnet'
+
+
+class PeerMapper(DataclassMapper[Peer]):
+    model = Peer
+    table_name = 'sarafan_peers'
+    only_fields = ('service_id', 'rating')

@@ -1,15 +1,16 @@
 import inspect
-import sqlite3
 from pathlib import Path
 
-from core_service import Service
+from core_service import Service, listener, task
 
 from .collections import (
     Collection,
     PostsCollection,
     PublicationsCollection,
+    PeersCollection,
 )
 from .migrations import apply_migrations
+from ..models import Peer
 
 
 class DatabaseService(Service):
@@ -19,8 +20,9 @@ class DatabaseService(Service):
     Manage set of collections with a business-oriented interface.
     """
 
-    publications = PublicationsCollection
-    posts = PostsCollection
+    publications: PublicationsCollection = PublicationsCollection
+    posts: PostsCollection = PostsCollection
+    peers: PeersCollection = PeersCollection
     # comments = CommentsCollection
 
     def __init__(self, database: str = ':memory:', **kwargs):
@@ -42,3 +44,16 @@ class DatabaseService(Service):
     async def stop(self):
         await super().stop()
         self.log.info("Database connection was closed")
+
+    @listener(Peer)
+    async def store_peers(self, peer: Peer):
+        """Store all Peers emited on service bus in the database.
+        """
+        await self.peers.store(peer)
+
+    @task(periodic=False)
+    async def restore_peers(self):
+        self.log.info("Restoring peers from the database")
+        for peer in self.peers.all():
+            self.log.info("Restoring peer %s", peer)
+            await self.emit(peer)

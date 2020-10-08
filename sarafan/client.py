@@ -194,7 +194,7 @@ class SarafanClient:
         for peer in self.peers.nearest(magnet):
             client = PeerClient(peer, self.proxy)
             try:
-                client.upload(magnet, local_path)
+                await client.upload(magnet, local_path)
                 success_count += 1
                 if success_count >= peers_count:
                     break

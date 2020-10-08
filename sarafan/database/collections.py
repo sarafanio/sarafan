@@ -6,8 +6,8 @@ from urllib.parse import parse_qs, urlencode
 
 from ..events import Publication, Post
 
-from .mappers import AbstractMapper, DataclassMapper, PostMapper, PublicationMapper
-
+from .mappers import AbstractMapper, DataclassMapper, PostMapper, PublicationMapper, PeerMapper
+from ..models import Peer
 
 log = logging.getLogger(__name__)
 
@@ -55,12 +55,12 @@ class Collection(Generic[T]):
                 values = self.mapper.get_insert_data(obj)
                 fields = ', '.join(values.keys())
                 subs = ','.join(['?'] * len(values))
-                query = f"INSERT INTO {self.table_name} ({fields}) VALUES ({subs})"
+                query = f"INSERT OR REPLACE INTO {self.table_name} ({fields}) VALUES ({subs})"
                 cursor = db.cursor()
                 log.debug("Store %s with insert query `%s` and args %s", obj, query, values.values())
                 cursor.execute(query, list(values.values()))
-        except Exception:
-            log.exception("Failed to store post")
+        except Exception:  # TODO: better error handling
+            log.exception("Failed to store %s", obj)
 
 
 class PublicationsCollection(Collection[Publication]):
@@ -79,7 +79,7 @@ class PostsCollection(Collection[Post]):
             # import ipdb; ipdb.set_trace()
             last_time = cursor_data[b't'][0].decode()
             last_rowid = cursor_data[b'r'][0].decode()
-            query += f"WHERE created_at <= ? AND ROWID < ? "
+            query += "WHERE created_at <= ? AND ROWID < ? "
             args += [last_time, last_rowid]
         query += f"ORDER BY created_at DESC LIMIT {per_page}"
         with self.db as db:
@@ -93,3 +93,15 @@ class PostsCollection(Collection[Post]):
                 'r': result[-1]['ROWID']
             }).encode()).decode()
         return [self.mapper.build_object(item) for item in result], next_cursor
+
+
+class PeersCollection(Collection[Peer]):
+    mapper = PeerMapper()
+
+    def all(self):
+        query = "SELECT * FROM sarafan_peers;"
+        with self.db as db:
+            cursor = db.cursor()
+            cursor.execute(query)
+            result = cursor.fetchall()
+        return [self.mapper.build_object(item) for item in result]

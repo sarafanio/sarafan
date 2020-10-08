@@ -36,6 +36,7 @@ class StorageService(Service):
         check = keccak.new(digest_bytes=32)
 
         try:
+            Path(tmp_content_path).parent.mkdir(parents=True, exist_ok=True)
             with open(tmp_content_path, 'wb') as fd:
                 async for chunk, _ in content.iter_chunks():
                     fd.write(chunk)
@@ -47,7 +48,11 @@ class StorageService(Service):
                 raise InvalidChecksum(magnet, checksum)
             shutil.move(tmp_content_path, to_path)
         finally:
-            os.unlink(tmp_content_path)
+            try:
+                os.unlink(tmp_content_path)
+            except FileNotFoundError:
+                # it is ok, file was moved
+                pass
 
     def get_absolute_path(self, magnet) -> Path:
         return self.base_path / magnet_path(magnet)

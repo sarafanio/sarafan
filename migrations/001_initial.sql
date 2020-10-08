@@ -24,9 +24,9 @@ create table sarafan_posts (
     Peer
 */
 create table sarafan_peers(
-    hostname text primary key,
+    service_id text primary key,
     created_at integer default CURRENT_TIMESTAMP,
     rating real default 0.5,
-    last_seen integer default CURRENT_TIMESTAMP
+    last_seen integer
 );
-create unique index idx_sarafan_peer_hostname on sarafan_peers (hostname);
+create unique index idx_sarafan_peer_hostname on sarafan_peers (service_id);

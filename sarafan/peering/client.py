@@ -75,12 +75,11 @@ class PeerClient:
     def __init__(self, peer: Peer, http_proxy: str = "socks5://127.0.0.1:9050"):
         self.peer = peer
         self.http_proxy = http_proxy
-        self._connector = ProxyConnector.from_url(http_proxy)
 
     @property
     def _session(self) -> ClientSession:
         return ClientSession(
-            connector=self._connector,
+            connector=ProxyConnector.from_url(self.http_proxy),
             raise_for_status=True,
             timeout=ClientTimeout(
                 total=60, connect=30, sock_read=10
@@ -136,14 +135,15 @@ class PeerClient:
         log.debug("Making %s discovery request to %s", magnet, self.peer)
         try:
             data = await self._get(self._url('discover'), params=discover_body)
-            if 'match' not in data and 'near' not in data:
-                log.debug("Peer discovery response didn't contain keys `match` or `near`")
-                raise InvalidPeerResponse()
+            # if 'match' not in data and 'near' not in data:
+            #     log.debug("Peer discovery response didn't contain keys `match` or `near`")
+            #     raise InvalidPeerResponse()
         except (ProxyError, aiohttp.ClientError, ConnectionError, ProxyTimeoutError) as e:
+            log.debug("Received invalid peer response from %s for %s", self.peer, magnet)
             raise InvalidPeerResponse() from e
         result = DiscoveryResult(
-            match=[Peer(**d) for d in data.get('match')],
-            near=[Peer(**d) for d in data.get('near')]
+            # match=[Peer(**d) for d in data.get('match')],
+            near=[Peer(**d) for d in data]
         )
         log.debug("Discovery results from peer %s: %s", self.peer, result)
         return result
@@ -188,15 +188,16 @@ class PeerClient:
         """Check if node storing provided magnet.
         """
         try:
-            await self._head(self._content_url(magnet_path(magnet)))
-        except (ClientResponseError, ProxyError, ConnectionError):
+            await self._head(self.download_url(magnet))
+        except (ClientResponseError, ProxyError, ConnectionError) as e:
             # if e.status == 404:
             #     return False
+            log.debug("has_magnet is False %s", e)
             return False
         return True
 
     def download_url(self, magnet):
-        return self._content_url(magnet_path(magnet))
+        return self._content_url('content/' + magnet_path(magnet))
 
     @property
     def closed(self):
@@ -235,14 +236,28 @@ class PeerClient:
         return await self._request('post', *args, **kwargs)
 
     async def _head(self, *args, **kwargs):
+        kwargs['parse_json'] = False
         return await self._request('head', *args, **kwargs)
 
     async def _request(self, method, *args, **kwargs):
+        log.debug("Requesting %s %s %s using %s", method, args, kwargs, self.http_proxy)
+        # TODO: remove hack
+        parse_json = kwargs.pop('parse_json', True)
         try:
-            async with getattr(self._session, method)(*args, **kwargs) as response:
-                await self._handle_errors(response)
-                return await response.json()
-        except (aiohttp.ClientConnectionError, ProxyError, asyncio.TimeoutError, ProxyTimeoutError) as e:
+            async with ClientSession(
+                connector=ProxyConnector.from_url(self.http_proxy),
+                raise_for_status=True,
+                timeout=ClientTimeout(
+                    total=10, connect=5, sock_read=5
+                )
+            ) as session:
+                async with getattr(session, method)(*args, **kwargs) as response:
+                    await self._handle_errors(response)
+                    if parse_json:
+                        return await response.json()
+                    else:
+                        return response
+        except (aiohttp.ClientConnectionError, ProxyError, asyncio.TimeoutError, ProxyTimeoutError, RuntimeError) as e:
             raise ConnectionError from e
 
     async def _handle_errors(self, response):
@@ -258,6 +273,6 @@ class PeerClient:
             raise UnsupportedPeerMethod()
         else:
             body = await response.content.read(1024 * 50)
-            log.debug("Receiving invalid peer %s response for `hello` (status: %i): %s",
+            log.debug("Receiving invalid peer %s response (status: %i): %s",
                       self.peer, response.status, body)
             raise InvalidPeerResponse()

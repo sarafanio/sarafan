@@ -118,7 +118,7 @@ class BaseContractEvent:
             if f.metadata.get("abi_hex_bytes"):
                 snake_data[f.name] = snake_data[f.name].hex()
             elif f.metadata.get("abi_ascii_bytes"):
-                snake_data[f.name] = snake_data[f.name].decode('ascii')
+                snake_data[f.name] = snake_data[f.name].decode('ascii').rstrip('\x00')
         return cls(**snake_data)
 
     @classmethod
