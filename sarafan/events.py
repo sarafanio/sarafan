@@ -123,6 +123,18 @@ class DiscoveryFailed:
 
 @dataclass_json
 @dataclass
+class DownloadFinished:
+    """Finished download bus event.
+
+    Emitted by the download service after corresponding content bundle downloaded
+    from the Sarafan peering network.
+    """
+    #: downloaded publication
+    publication: Publication
+
+
+@dataclass_json
+@dataclass
 class NewPeer(BaseContractEvent):
     """NewPeer event from the peering contract.
 

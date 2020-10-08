@@ -11,33 +11,39 @@ from functools import lru_cache
 from Cryptodome.Hash import keccak
 
 
-def hex_to_position(value: str):
+def ascii_to_hash(value) -> str:
+    """Convert ascii string (service_id in terms of sarafan) to measurable hash.
+    """
+    data = bytes(value, 'ascii')
+    return keccak.new(data=data, digest_bytes=32).hexdigest()
+
+
+def hex_to_position(value: str) -> int:
     """Convert hex string to int position.
     """
     return int(value, 16)
 
 
 @lru_cache(50)
-def ascii_to_position(value: str):
+def ascii_to_position(value: str) -> int:
     """Convert ascii string to int position.
 
     keccak256 hash will be used to normalize strings.
     """
-    data = bytes(value, 'ascii')
-    return hex_to_position(keccak.new(data=data, digest_bytes=32).hexdigest())
+    return hex_to_position(ascii_to_hash(value))
 
 
-def peer_hash(peer):
+def peer_hash(peer) -> int:
     return ascii_to_position(peer.service_id)
 
 
-def distance(x: int, y: int):
+def distance(x: int, y: int) -> float:
     """Calculate distance between two points.
     """
     return abs(math.sin(x ^ y))
 
 
-def hash_distance(hash1: str, hash2: str):
+def hash_distance(hash1: str, hash2: str) -> float:
     """Distance between two hex-encoded hashes (result of `hexdigest()`).
 
     Hash lengths should be equal.
@@ -46,7 +52,7 @@ def hash_distance(hash1: str, hash2: str):
     return distance(hex_to_position(hash1), hex_to_position(hash2))
 
 
-def ascii_distance(s1: str, s2: str):
+def ascii_distance(s1: str, s2: str) -> float:
     """Distance between two ascii strings.
 
     keccak256 hash will be used to normalize them.
@@ -54,5 +60,5 @@ def ascii_distance(s1: str, s2: str):
     return distance(ascii_to_position(s1), ascii_to_position(s2))
 
 
-def ascii_to_hash_distance(s: str, h: str):
+def ascii_to_hash_distance(s: str, h: str) -> float:
     return distance(ascii_to_position(s), hex_to_position(h))

@@ -71,15 +71,16 @@ class PeerClient:
 
     http_proxy: str
 
-    _session: ClientSession
-
     # TODO: rename http_proxy -> socks_proxy
     def __init__(self, peer: Peer, http_proxy: str = "socks5://127.0.0.1:9050"):
         self.peer = peer
         self.http_proxy = http_proxy
-        connector = ProxyConnector.from_url(http_proxy)
-        self._session = ClientSession(
-            connector=connector,
+        self._connector = ProxyConnector.from_url(http_proxy)
+
+    @property
+    def _session(self) -> ClientSession:
+        return ClientSession(
+            connector=self._connector,
             raise_for_status=True,
             timeout=ClientTimeout(
                 total=60, connect=30, sock_read=10
@@ -141,8 +142,8 @@ class PeerClient:
         except (ProxyError, aiohttp.ClientError, ConnectionError, ProxyTimeoutError) as e:
             raise InvalidPeerResponse() from e
         result = DiscoveryResult(
-            match=data.get('match'),
-            near=data.get('near')
+            match=[Peer(**d) for d in data.get('match')],
+            near=[Peer(**d) for d in data.get('near')]
         )
         log.debug("Discovery results from peer %s: %s", self.peer, result)
         return result

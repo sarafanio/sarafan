@@ -1,61 +1,14 @@
 import asyncio
-import enum
-from dataclasses import dataclass, field
-import time
-from typing import Callable, AsyncGenerator, Optional, List
 
-from core_service import Service, task, listener
+from core_service import Service, listener
 
-from .events import DiscoveryFinished
-from .peering import PeerClient
-from .models import Peer
-from .peering.client import InvalidChecksum, DownloadError
-from .peering.service import MagnetNotDiscovered
+from .events import DiscoveryFinished, DownloadRequest, DiscoveryRequest, Publication, DownloadFinished
+from .peering.client import InvalidChecksum, DownloadError, PeerClient
 from .storage import StorageService
 
 
-class DownloadStatus(enum.Enum):
-    #: new or queued download
-    PENDING = 'PENDING'
-    #: magnet discovery started
-    DISCOVERY = 'DISCOVERY'
-    #: download in progress
-    DOWNLOAD = 'DOWNLOAD'
-    #: download finished successfully
-    FINISHED = 'FINISHED'
-    #: download failed
-    FAILED = 'FAILED'
-
-
-@dataclass
-class PeerResult:
-    #: download time
-    timestamp: float
-    #: download from peer
-    peer: Peer
-    #: is peer alive at the moment of download
-    peer_alive: bool = False
-    #: is magnet content found on peer
-    magnet_found: bool = False
-    #: is magnet content downloaded successfully
-    success: bool = False
-    #: download time in seconds
-    download_time: Optional[float] = None
-    #: downloaded size
-    download_size: Optional[int] = None
-    #: optional message (error reason)
-    message: str = ""
-
-
-@dataclass
-class Download:
-    magnet: str
-    status: DownloadStatus = DownloadStatus.PENDING
-    log: List[PeerResult] = field(default_factory=list)
-
-
 class DownloadService(Service):
-    """Download manager service.
+    """Download service.
 
     Handle download queue. New download can be added with `add` method. Content hash (magnet) should
     be provided. Then, `download_task` will handle discovery and actually download content file.
@@ -67,10 +20,6 @@ class DownloadService(Service):
 
     #: internal queue with Download items to download
     download_queue: asyncio.Queue
-    #: queue with finished Download items
-    finished: asyncio.Queue
-    #: queue with failed Download items
-    failed: asyncio.Queue
 
     def __init__(self,
                  storage: StorageService,
@@ -82,11 +31,36 @@ class DownloadService(Service):
         self.finished = asyncio.Queue()
         self.failed = asyncio.Queue()
 
-    async def add(self, magnet: str):
-        """Add magnet to download queue.
+    def should_download_magnet(self, magnet):
+        """Should current node download provided magnet or not.
+
+        Make decision based on the distance etc.
+
+        TODO: implementation
         """
-        obj = Download(magnet)
-        await self.download_queue.put(obj)
+        return True
+
+    @listener(Publication)
+    async def process_new_publications(self, publication: Publication):
+        """Process new publications from blockchain.
+        """
+        # TODO: check if it already downloaded
+        # TODO: check if it is downloaded but not parsed yet, submit to parse
+        if self.should_download_magnet(publication.magnet):
+            # it might be more viable to emit DownloadRequest first
+            await self.emit(DiscoveryRequest(publication=publication))
+        else:
+            self.log.debug("Won't download publication %s because of download service policy",
+                           publication)
+
+    @listener(DownloadRequest)
+    async def process_download_request(self, request: DownloadRequest):
+        """Process download request.
+
+        Instead of new publications it is a forced way to download content
+        without distance check etc.
+        """
+        await self.emit(DiscoveryRequest(publication=request.publication))
 
     @listener(DiscoveryFinished)
     async def finished_discovery_handler(self, event: DiscoveryFinished):
@@ -94,48 +68,24 @@ class DownloadService(Service):
 
         Start download content bundle from discovered peer.
 
-        Emit
+        Emit DownloadFinished event on success which can be handled to
+        unpack and store publication in db and/or to add new file to the merkle
+        hash tree.
         """
         magnet = event.publication.magnet
-        download.status = DownloadStatus.DISCOVERY
-        try:
-            async for client in self.discovery(magnet):
-                peer_result = PeerResult(
-                    timestamp=time.monotonic_ns(),
-                    peer=client.peer
-                )
-                try:
-                    download.status = DownloadStatus.DOWNLOAD
-                    await client.download(magnet, self.storage.store)
-                    download.status = DownloadStatus.FINISHED
-                    peer_result.peer_alive = True
-                    peer_result.magnet_found = True
-                    peer_result.success = True
-                    peer_result.download_time = time.monotonic_ns() - peer_result.timestamp
-                except InvalidChecksum:
-                    # TODO: need to decrease peer rating
-                    download.status = DownloadStatus.DISCOVERY
-                    peer_result.peer_alive = True
-                    peer_result.magnet_found = True
-                    peer_result.message = "Invalid checksum"
-                    self.log.warning("Invalid content checksum for magnet %s from peer %s",
-                                     magnet, client.peer)
-                except DownloadError:
-                    peer_result.message = "HTTP error"
-                    self.log.error("Error while downloading magnet %s from peer %s",
-                                   magnet, client.peer, exc_info=True)
-                download.log.append(peer_result)
-                if download.status == DownloadStatus.FINISHED:
-                    return download
-        except MagnetNotDiscovered:
-            self.log.info("Magnet is not discovered and will be scheduled to download later")
-            # FIXME: schedule "to download later"
-            self.log.warning("Delayed download doesn't implemented yet")
+        client = PeerClient(event.peer)
 
-    @task()
-    async def download_task(self):
-        download = await self.download_queue.get()
         try:
-            await self.download(download)
-        except asyncio.TimeoutError:
-            self.log.info("Download timed out")
+            await client.download(magnet, self.storage.store)
+            await self.emit(DownloadFinished(publication=event.publication))
+            return
+        except InvalidChecksum:
+            # TODO: need to decrease peer rating
+            self.log.warning("Invalid content checksum for magnet %s from peer %s",
+                             magnet, client.peer)
+        except DownloadError:
+            self.log.error("Error while downloading magnet %s from peer %s",
+                           magnet, client.peer, exc_info=True)
+        # TODO: it might be better to emit DownloadFailed and dispatch it in the Scheduler
+        # emit new discovery request in case of failure
+        await self.emit(DiscoveryRequest(publication=event.publication, state=event.state))

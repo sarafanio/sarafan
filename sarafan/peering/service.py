@@ -13,7 +13,7 @@ from itertools import chain
 from typing import List, Dict
 
 from aiohttp_socks import ProxyError
-from core_service import Service, task, listener
+from core_service import Service, listener
 
 from ..events import NewPeer, DiscoveryRequest, DiscoveryFinished, DiscoveryFailed
 from ..distance import ascii_to_hash_distance
@@ -22,12 +22,6 @@ from ..models import Peer
 from .client import PeerClient, InvalidPeerResponse
 
 log = logging.getLogger(__name__)
-
-
-class MagnetNotDiscovered(Exception):
-    """Exception raised if content for requested magnet can't be found.
-    """
-    pass
 
 
 @dataclass
@@ -118,18 +112,14 @@ class PeeringService(Service):
     async def distribute(self, filename, magnet):
         """Schedule distribution of provided content bundle.
         """
-        await self._distribution_queue.put(
-            DistributionTask(filename, magnet)
-        )
+        await self.emit(DistributionTask(filename, magnet))
 
-    @task()
-    async def _distribute_task(self):
+    @listener(DistributionTask)
+    async def distribute_task(self, task_instance: DistributionTask):
         """Actually distribute bundle.
         """
-        task = await self._distribution_queue.get()
-
         while True:
-            peers = self.peers_by_distance(task.magnet)
+            peers = self.peers_by_distance(task_instance.magnet)
             if len(peers) == 0:
                 log.warning("No peers found. Can't publish post, wait 10s and retry")
                 await asyncio.sleep(10)
@@ -139,13 +129,13 @@ class PeeringService(Service):
         success_upload_count = 0
         for peer in peers:
             client = self.get_client(peer)
-            with open(task.filename, 'rb') as fp:
-                await client.upload(task.magnet, fp)
+            with open(task_instance.filename, 'rb') as fp:
+                await client.upload(task_instance.magnet, fp)
             success_upload_count += 1
             if success_upload_count >= 10:
                 break
         log.info("Content bundle %s distributed to %i nodes",
-                 task.magnet, success_upload_count)
+                 task_instance.magnet, success_upload_count)
 
     @listener(NewPeer)
     async def handle_new_peers(self, new_peer: NewPeer):
