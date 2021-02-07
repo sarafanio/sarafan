@@ -185,7 +185,7 @@ async def post_list(request):
 async def create_post(request):
     """Create post and estimate publication cost.
     """
-    tmp_post_id = '%s.draft' % str(uuid4())
+    tmp_post_id = str(uuid4())
     base_path = PROJECT_ROOT / 'content' / 'drafts'
     filename = base_path / ('{}.draft'.format(tmp_post_id))
     d = await request.json()

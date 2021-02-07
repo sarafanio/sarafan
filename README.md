@@ -22,11 +22,25 @@ pip install sarafan
 
 ## Running tor proxy
 
+### MacOS
+
 ```bash
 brew install tor
+cp /usr/local/etc/tor/torrc{.sample,}
+sed -i '' 's/#ControlPort 9051/ControlPort 9051/g' /usr/local/etc/tor/torrc
+brew services start tor
 ```
 
-You need also to enable control port in your `torrc`.
+## Starting ethereum node
+
+For development, you likely have to spin up your own blockchain and contract. 
+The easiest possible option is to use Ganache https://www.trufflesuite.com/ganache
+to start blockchain with your own node.
+
+Start Ganache app and create a new blockchain.
+
+You should also deploy contract. See contract repository README
+for details: https://github.com/sarafanio/contract#development
 
 ## Getting started
 
@@ -42,7 +56,7 @@ or you can execute python module:
 python -m sarafan
 ```
 
-Web UI will be available at http://127.0.0.1:21112 by default.
+Web UI will be available at http://127.0.0.1:9231 by default.
 
 ## Configuration
 
