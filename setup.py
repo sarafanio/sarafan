@@ -10,7 +10,7 @@ setup(
                 'publication delivery network for anonymous.',
     packages=find_packages(),
     install_requires=[
-        'core-service >= 0.1.0',
+        'core-service >= 0.2.0',
         'stem >= 1.8.0',
         'aiohttp >= 3.6.2',
         'aiohttp-cors >= 0.7.0',
