@@ -46,7 +46,6 @@ async def test_remove_peer(peering):
     await peering.remove_peer(peer)
     peers_list = list(peering.peers_by_distance(generate_rnd_hash()))
     assert len(peers_list) == 0
-    await client.close()
 
 
 @pytest.mark.asyncio
@@ -90,8 +89,8 @@ async def test_handle_discovery_request(has_magnet_mock, discover_mock, peering:
     with timeout(1):
         event: DiscoveryFinished = await queue.get()
         assert event.publication == publication
-    assert has_magnet_mock.called_once()
-    assert discover_mock.called_once()
+    assert await has_magnet_mock.called_once()
+    assert await discover_mock.called_once()
 
     failed_queue = service_bus.subscribe(DiscoveryFailed)
     await peering.dispatch(DiscoveryRequest(publication=publication, state=event.state))
@@ -119,5 +118,5 @@ async def test_discovery_failed(has_magnet_mock, discover_mock, peering: Peering
     with timeout(1):
         event: DiscoveryFailed = await queue.get()
         assert event.publication == publication
-    assert has_magnet_mock.called_once()
-    assert discover_mock.called_once()
+    assert await has_magnet_mock.called_once()
+    assert await discover_mock.called_once()

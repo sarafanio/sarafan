@@ -199,18 +199,6 @@ class PeerClient:
     def download_url(self, magnet):
         return self._content_url('content/' + magnet_path(magnet))
 
-    @property
-    def closed(self):
-        """Check if client session was closed.
-        """
-        return self._session.closed
-
-    async def close(self):
-        """Close client and underlying connections.
-        """
-        if not self._session.closed:
-            await self._session.close()
-
     def _url(self, uri):
         """Build url for peer.
         """

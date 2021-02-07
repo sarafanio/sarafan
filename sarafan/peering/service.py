@@ -85,16 +85,14 @@ class PeeringService(Service):
         """
         self.peers_by_rating.remove(peer)
         del self.peers[peer.service_id]
-        if peer.service_id in self._peer_clients:
-            client = self._peer_clients[peer.service_id]
-            if not client.closed:
-                await client.close()
 
     def get_client(self, peer):
         """Get client instance for peer.
 
         TODO: cleanup unused clients or use single one
         """
+        if not self.running or self.should_stop:
+            raise RuntimeError("Should stop")
         client = self._peer_clients.get(peer.service_id)
         if not client:
             client = PeerClient(peer)
@@ -196,8 +194,6 @@ class PeeringService(Service):
                         peer.rating = peer.rating / 4
                         await self.emit(peer)
                         continue
-                    finally:
-                        await client.close()
         finally:
             await self.emit(DiscoveryFailed(
                 publication=request.publication,
